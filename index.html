@@ -1,0 +1,1848 @@
+<!doctype html>
+<html lang="es-MX">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Guardia COLREG</title>
+<meta name="theme-color" content="#09121a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Simulador COLREG">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: consola de puente nocturna. Radar a la izquierda, mando y ARPA a la derecha; en celular todo en una columna. */
+:root{
+  --bg:#09121a; --panel:#0f1b25; --panel2:#14222e; --line:#223442;
+  --fg:#d7e1e7; --muted:#8499a8; --amber:#f2a93b; --amber-dim:#7a5521;
+  --cyan:#66c9d8; --ok:#52d183; --warn:#e7c94e; --bad:#ff5f57;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left));padding-block:max(20px,env(safe-area-inset-top)) 48px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.4vw,40px);letter-spacing:.02em;margin:0;line-height:1;text-wrap:balance}
+h1 span{color:var(--amber)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.legend{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.label{font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.12em;font-size:12.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.03em;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:7px 12px;cursor:pointer}
+.chip small{color:var(--muted);font-family:var(--f-mono);font-weight:400;font-size:11px;margin-right:6px}
+.chip[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+.chip:hover{border-color:var(--amber-dim)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:880px){.main{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;min-width:0}
+.radar-box{position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1/1}
+#radar{width:100%;height:100%;display:block;cursor:crosshair;touch-action:manipulation}
+.readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.ro{background:var(--panel2);border-radius:4px;padding:8px 10px;min-width:0}
+.ro b{display:block;font-family:var(--f-mono);font-weight:500;font-size:18px;font-variant-numeric:tabular-nums;color:var(--fg)}
+.ro span{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.1em;font-size:11px;color:var(--muted)}
+@media (max-width:460px){.readout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.04em;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px 12px;cursor:pointer;min-height:38px}
+.btn:hover{border-color:var(--muted)}
+.btn.port{color:#ff8a83}.btn.stbd{color:#7fe3a5}
+.btn.primary{background:var(--amber);color:#1b1206;border-color:var(--amber)}
+.btn.primary:disabled{opacity:.4;cursor:not-allowed}
+.btn[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.course{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.course .big{font-family:var(--f-mono);font-size:26px;font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:center;color:var(--amber)}
+.course input{width:5.5em;font-family:var(--f-mono);font-size:15px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:7px 8px}
+.ctl{display:flex;flex-direction:column;gap:8px}
+.ctl + .ctl{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.brief h2{font-family:var(--f-display);font-size:24px;font-weight:700;margin:2px 0 6px;letter-spacing:.02em;text-wrap:balance}
+.brief p{margin:0 0 10px;max-width:65ch}
+.cond{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.tag{font-family:var(--f-mono);font-size:11.5px;border:1px solid var(--line);border-radius:3px;padding:2px 7px;color:var(--muted)}
+.tag.night{color:var(--cyan);border-color:#2b5560}.tag.fog{color:#c4ccd2;border-color:#4b555c}.tag.day{color:var(--amber);border-color:var(--amber-dim)}
+.quiz{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.qopt{text-align:left;font-family:var(--f-body);font-size:14.5px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:9px 11px;cursor:pointer}
+.qopt.right{border-color:var(--ok);color:var(--ok)}.qopt.wrong{border-color:var(--bad);color:#ff9a94}
+.qopt:disabled{cursor:default}
+.explain{background:var(--panel2);border-left:3px solid var(--amber);padding:9px 12px;border-radius:0 4px 4px 0;font-size:14px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+th{font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:11.5px;color:var(--muted);text-align:right;padding:4px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{text-align:right;padding:6px 6px;border-bottom:1px solid #1a2a36;white-space:nowrap;cursor:pointer}
+tr.sel td{background:#1a2b38}
+td.alert{color:var(--bad);font-weight:500}
+.trend{font-size:13px;color:var(--muted);margin-top:8px}
+.trend b{color:var(--fg);font-weight:500}
+#view{width:100%;height:150px;display:block;border-radius:4px;background:#04070c}
+.aspect{font-size:13.5px;margin-top:8px;color:var(--muted)}
+.aspect b{color:var(--fg);font-weight:500}
+.log{font-family:var(--f-mono);font-size:12px;max-height:170px;overflow:auto;display:flex;flex-direction:column;gap:3px}
+.log div span{color:var(--muted);margin-right:8px}
+.debrief h2{font-family:var(--f-display);font-size:26px;margin:0 0 4px}
+.debrief .verdict-ok{color:var(--ok)}.debrief .verdict-bad{color:var(--bad)}.debrief .verdict-warn{color:var(--warn)}
+.checks{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.checks li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;font-size:14px}
+.checks .ic{font-family:var(--f-mono);font-weight:500;text-align:center}
+.checks .ok .ic{color:var(--ok)}.checks .warn .ic{color:var(--warn)}.checks .fail .ic{color:var(--bad)}
+.checks small{display:block;color:var(--muted);font-family:var(--f-mono);font-size:11.5px}
+.guide h2{font-family:var(--f-display);font-size:28px;margin:0 0 4px;letter-spacing:.02em}
+.guide > p{color:var(--muted);margin:0 0 14px;max-width:70ch}
+.ggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
+.gitem{background:var(--panel2);border-radius:5px;padding:12px 14px}
+.gitem h3{font-family:var(--f-display);font-size:19px;margin:0 0 6px;color:var(--amber);letter-spacing:.02em}
+.gitem p,.gitem li{font-size:14.5px;max-width:65ch}
+.gitem p{margin:0 0 6px}
+.gitem ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.gitem em{color:var(--cyan);font-style:normal;font-family:var(--f-mono);font-size:13px}
+.kbd{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid var(--line)}
+.tab{font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:.03em;background:none;color:var(--muted);border:0;border-bottom:3px solid transparent;padding:8px 14px 9px;cursor:pointer;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--amber)}
+.tab small{font-family:var(--f-body);font-weight:400;font-size:13px;color:var(--muted);margin-left:6px}
+.mode{display:flex;flex-direction:column;gap:18px}
+.plan-box{position:relative;width:100%;aspect-ratio:5/4;max-height:72vh}
+#plan{width:100%;height:100%;display:block;border-radius:4px;touch-action:manipulation}
+.banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--bad);color:#fff;font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.06em;padding:6px 14px;border-radius:3px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+.ctx{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 16px}
+.ctx b{color:var(--fg);font-weight:500}
+.rudbar{position:relative;height:8px;background:var(--panel2);border-radius:4px;margin-top:4px}
+.rudbar i{position:absolute;top:0;height:8px;border-radius:4px}
+.rudbar .mid{position:absolute;left:50%;top:-3px;width:1px;height:14px;background:var(--muted)}
+.wheel{display:block;width:min(190px,60vw);aspect-ratio:1/1;margin:6px auto 0;touch-action:none;cursor:grab}
+.wheel.grab{cursor:grabbing}
+.lines{display:flex;flex-direction:column;gap:6px}
+.lineitem{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel2);border-radius:4px;padding:6px 8px 6px 10px;font-size:14px}
+.lineitem .ten{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.lineitem.off{opacity:.5}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.watch{font-family:var(--f-mono);font-size:13px;color:var(--muted);margin:8px 0 10px;min-height:2.9em}
+.watch.hot{color:var(--amber)}
+.watchp{position:sticky;top:8px;z-index:2}
+#x-alert.fired{background:var(--amber);color:#000}
+.said{background:var(--panel2);border-left:3px solid var(--cyan);padding:9px 12px;border-radius:0 4px 4px 0;margin:0 0 10px}
+.said b{font-family:var(--f-display);letter-spacing:.06em;text-transform:uppercase;font-size:12.5px;color:var(--cyan);display:block}
+.sheet{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;margin:8px 0 0;font-size:13.5px}
+.sheet dt{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.08em;font-size:11.5px;color:var(--muted);padding-top:2px}
+.sheet dd{margin:0}
+.numin{width:6.5em;font-family:var(--f-mono);font-size:15px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:7px 8px}
+.score{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin:10px 0}
+.sech{font-family:var(--f-display);font-size:16px;letter-spacing:.04em;color:var(--amber);margin:16px 0 0}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Simulador de Guardia <span>COLREG</span></h1>
+      <p class="sub">Práctica para Oficial de Guardia. En las dos primeras pestañas escoges un escenario, contestas la pregunta inicial y maniobras con timón y máquina; la tercera recorre el examen de ascenso paso a paso. Al final recibes la evaluación con la regla o la buena práctica que aplica.</p>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-colreg" aria-selected="true">Navegación COLREG<small>9 escenarios</small></button>
+    <button class="tab" role="tab" id="tab-man" aria-selected="false">Maniobra en puerto y emergencias<small>7 escenarios</small></button>
+    <button class="tab" role="tab" id="tab-exam" aria-selected="false">Examen de ascenso<small>hoja de evaluación</small></button>
+    <a class="tab" href="quiz.html" style="text-decoration:none">Banco de preguntas<small>guía UMPM · inglés</small></a>
+  </div>
+
+  <section class="mode" id="mode-colreg">
+  <div class="legend"><span><i style="background:var(--cyan)"></i>Buque propio</span><span><i style="background:var(--amber)"></i>Blanco ARPA</span><span><i style="background:var(--bad)"></i>CPA &lt; 1 mn</span></div>
+  <div>
+    <div class="label" style="margin-bottom:8px">Escenarios</div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="main">
+    <div class="col">
+      <div class="panel">
+        <div class="radar-box"><canvas id="radar" aria-label="Pantalla de radar, norte arriba, movimiento relativo"></canvas></div>
+        <div class="readout">
+          <div class="ro"><span>Hora</span><b id="ro-time">--:--</b></div>
+          <div class="ro"><span>Rumbo</span><b id="ro-hdg">000°</b></div>
+          <div class="ro"><span>Velocidad</span><b id="ro-spd">14.0 kn</b></div>
+          <div class="ro"><span>Escala</span><b id="ro-rng">6 mn</b></div>
+        </div>
+        <div class="row" style="margin-top:12px;justify-content:space-between">
+          <div class="seg" id="accel"></div>
+          <div class="seg">
+            <button class="btn" id="b-range">Cambiar escala</button>
+            <button class="btn" id="b-pause">Pausa</button>
+            <button class="btn" id="b-reset">Reiniciar</button>
+          </div>
+        </div>
+        <p class="kbd" style="margin:10px 0 0">Teclado: ← → cambia rumbo 5°, ↑ ↓ cambia máquina, espacio pausa. Toca un eco en el radar para seleccionarlo.</p>
+      </div>
+
+      <div class="panel">
+        <div class="label">Vista desde el puente (blanco seleccionado)</div>
+        <canvas id="view" style="margin-top:8px"></canvas>
+        <div class="aspect" id="aspect"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel brief" id="brief"></div>
+
+      <div class="panel" id="controls">
+        <div class="ctl">
+          <div class="label">Gobierno · rumbo ordenado</div>
+          <div class="course">
+            <button class="btn port" data-turn="-10">Br 10°</button>
+            <button class="btn port" data-turn="-5">Br 5°</button>
+            <div class="big" id="ord-hdg">000°</div>
+            <button class="btn stbd" data-turn="5">Er 5°</button>
+            <button class="btn stbd" data-turn="10">Er 10°</button>
+          </div>
+          <canvas class="wheel" id="c-wheel" role="img" aria-label="Rueda de gobierno: arrástrala para cambiar el rumbo ordenado"></canvas>
+          <p class="hint" style="text-align:center">Gira la rueda para cambiar el rumbo ordenado: una vuelta completa son 120°. Al centro es el rumbo inicial.</p>
+          <div class="course">
+            <label class="kbd" for="in-hdg">Gobierne al</label>
+            <input id="in-hdg" type="number" min="0" max="359" inputmode="numeric" placeholder="045">
+            <button class="btn" id="b-steer">Gobernar</button>
+            <button class="btn" id="b-back">Volver al rumbo inicial</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <div class="label">Telégrafo de máquina</div>
+          <div class="seg" id="engine"></div>
+        </div>
+        <div class="ctl">
+          <div class="label">Señales acústicas (Regla 34 / 35)</div>
+          <div class="seg" id="signals"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="label">ARPA</div>
+        <div class="tablewrap" style="margin-top:8px">
+          <table>
+            <thead><tr><th>Blanco</th><th>Dem</th><th>Dist</th><th>CPA</th><th>TCPA</th><th>Rbo</th><th>Vel</th></tr></thead>
+            <tbody id="arpa"></tbody>
+          </table>
+        </div>
+        <div class="trend" id="trend"></div>
+      </div>
+
+      <div class="panel">
+        <div class="label">Bitácora</div>
+        <div class="log" id="log" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <section class="mode" id="mode-man" hidden>
+    <div class="legend"><span><i style="background:var(--cyan)"></i>Buque propio · 120 m × 20 m · hélice dextrógira</span><span><i style="background:#e25a4f"></i>Boya roja</span><span><i style="background:#3fbf6e"></i>Boya verde</span><span><i style="background:#f2d24b"></i>Cabos</span></div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Escenarios de maniobra</div>
+      <div class="chips" id="m-chips"></div>
+    </div>
+    <div class="main">
+      <div class="col">
+        <div class="panel">
+          <div class="plan-box"><canvas id="plan" aria-label="Vista de carta del puerto, norte arriba, centrada en el buque"></canvas><div class="banner" id="m-banner" hidden></div></div>
+          <div class="readout">
+            <div class="ro"><span>Hora</span><b id="m-time">--</b></div>
+            <div class="ro"><span>Rumbo</span><b id="m-hdg">--</b></div>
+            <div class="ro"><span>Rot °/min</span><b id="m-rot">--</b></div>
+            <div class="ro"><span>Vel. long.</span><b id="m-spd">--</b></div>
+            <div class="ro"><span>Lateral proa</span><b id="m-latb">--</b></div>
+            <div class="ro"><span>Lateral popa</span><b id="m-lats">--</b></div>
+            <div class="ro"><span>Timón real</span><b id="m-rud">--</b></div>
+            <div class="ro"><span>Máquina rpm</span><b id="m-rpm">--</b></div>
+          </div>
+          <div class="ctx" id="m-ctx"></div>
+          <div class="row" style="margin-top:12px;justify-content:space-between">
+            <div class="seg" id="m-accel"></div>
+            <div class="seg">
+              <button class="btn" id="m-zout" aria-label="Alejar">− Zoom</button>
+              <button class="btn" id="m-zin" aria-label="Acercar">+ Zoom</button>
+              <button class="btn" id="m-pause">Pausa</button>
+              <button class="btn" id="m-reset">Reiniciar</button>
+            </div>
+          </div>
+          <p class="kbd" style="margin:10px 0 0">Teclado: ← → timón, ↑ ↓ telégrafo, Q / E hélice de proa a babor / estribor, W la para, espacio pausa. Las velocidades laterales son las del corredera Doppler: te dicen si proa o popa se acercan al muelle.</p>
+        </div>
+      </div>
+      <div class="col">
+        <div class="panel brief" id="m-brief"></div>
+        <div class="panel">
+          <div class="ctl">
+            <div class="label">Timón · ordenado <span id="m-rudord" style="color:var(--amber)">0°</span></div>
+            <div class="seg" id="m-rudbtns"></div>
+            <div class="rudbar"><span class="mid"></span><i id="m-rudind"></i></div>
+            <canvas class="wheel" id="m-wheel" role="img" aria-label="Rueda de timón: arrástrala para meter timón a babor o a estribor"></canvas>
+            <p class="hint" style="text-align:center">Gira la rueda arrastrando. Tope a 35°; los botones dan los ángulos exactos.</p>
+          </div>
+          <div class="ctl">
+            <div class="label">Telégrafo de máquina</div>
+            <div class="seg" id="m-tele"></div>
+          </div>
+          <div id="m-extra"></div>
+        </div>
+        <div class="panel">
+          <div class="label">Bitácora</div>
+          <div class="log" id="m-log" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mode" id="mode-exam" hidden>
+    <div class="legend"><span>Zarpe del muelle Richmond tramo 48-3 · guardia de 0800 · oficial de guardia a las órdenes del Capitán y del práctico</span></div>
+    <div class="main">
+      <div class="col">
+        <div class="panel watchp">
+          <div class="label">Vigilancia · visual, radar y alarmas</div>
+          <div class="watch" id="x-watch">Sin novedad.</div>
+          <button class="btn" id="x-alert">¡Alerta al Capitán!</button>
+        </div>
+        <div class="panel brief" id="x-step"></div>
+      </div>
+      <div class="col">
+        <div class="panel">
+          <div class="label">Hoja del ejercicio</div>
+          <dl class="sheet" id="x-data"></dl>
+        </div>
+        <div class="panel">
+          <div class="label">Bitácora · así se asienta</div>
+          <div class="log" id="x-log" style="margin-top:8px;max-height:260px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel guide" id="guia">
+    <h2>Lo que revisa el evaluador</h2>
+    <p>En el examen de simulador no solo cuenta no chocar. El instructor observa cómo llevas la guardia de principio a fin: qué miras, qué dices, qué anotas y cómo justificas cada maniobra con el Reglamento.</p>
+    <div class="ggrid">
+      <div class="gitem"><h3>1. Recibir la guardia</h3>
+        <p>Antes de aceptar la guardia, revisa en voz alta y pregunta lo que falte. Muchos evaluadores califican esto desde el primer minuto.</p>
+        <ul><li>Posición actual en la carta o ECDIS y cómo se obtuvo.</li><li>Rumbo, velocidad, derrota planeada y próximo punto de cambio.</li><li>Órdenes permanentes y nocturnas del Capitán.</li><li>Contactos a la vista y en radar, estado de radar, ARPA, GPS, girocompás y VHF (canal 16 en escucha).</li><li>Visibilidad, viento, mar y peligros cercanos.</li></ul></div>
+      <div class="gitem"><h3>2. Vigía y radar (Reglas 5 y 7)</h3>
+        <p>Mira afuera, no solo la pantalla. Di qué ves: "Buque por la amura de estribor, le veo luz de tope y verde".</p>
+        <ul><li>Adquiere los blancos en ARPA en cuanto aparezcan, no cuando ya están cerca.</li><li>Cambia de escala: larga para detectar, corta para maniobrar.</li><li>Marcación de compás que no cambia y distancia que baja significa riesgo de abordaje.</li><li>No saques conclusiones con información escasa. Si dudas, hay riesgo.</li></ul></div>
+      <div class="gitem"><h3>3. Cómo maniobrar (Reglas 8 y 16)</h3>
+        <p>La maniobra debe ser temprana, amplia y evidente para el otro buque, tanto a la vista como en su radar.</p>
+        <ul><li>Cambia 30° o más, o reduce mucho la velocidad. Varias caídas de 5° confunden al otro.</li><li>Pasa por la popa del buque que cruza, nunca por su proa.</li><li>Verifica con ARPA que el nuevo CPA es seguro (lo habitual es 1 mn o más en mar abierto).</li><li>Cuando el blanco esté pasado y claro, regresa a tu rumbo o derrota y dilo.</li><li>Antes de caer, revisa que el nuevo rumbo no te lleve a poca agua o hacia otro buque.</li></ul></div>
+      <div class="gitem"><h3>4. Buque que mantiene (Regla 17)</h3>
+        <p>Es donde más se equivocan. Si te toca mantener, conserva rumbo y velocidad y vigila.</p>
+        <ul><li>Si el otro no maniobra, toca 5 cortas y llámalo por VHF.</li><li>Puedes maniobrar cuando sea evidente que no actúa, pero no caigas a babor por un buque que está por tu babor.</li><li>Si ya no basta su maniobra para evitar el abordaje, estás obligada a actuar.</li></ul></div>
+      <div class="gitem"><h3>5. Visibilidad restringida (Regla 19)</h3>
+        <p>Aquí no hay buque que mantiene ni que cede: los dos deben evitar la situación de aproximación excesiva.</p>
+        <ul><li>Velocidad de seguridad y máquinas listas. Avisa al Capitán y a máquinas.</li><li>Señal de niebla: 1 larga cada 2 minutos como máximo (buque con arrancada).</li><li>Blanco por la proa del través: evita caer a babor, salvo que lo estés alcanzando.</li><li>Si oyes una señal de niebla por la proa del través, reduce al mínimo de gobierno.</li></ul></div>
+      <div class="gitem"><h3>6. Órdenes al timonel</h3>
+        <p>Da la orden clara, el timonel la repite y tú confirmas que se cumplió. Ese ciclo orden, repetición y verificación lo califican mucho.</p>
+        <ul><li><em>Timón a estribor diez</em> · <em>Timón a la banda</em> · <em>Timón a la vía</em></li><li><em>Gobierne al cero cuatro cinco</em> · <em>Firme así</em></li><li>Para la máquina: <em>Media avante</em>, <em>Poca avante</em>, <em>Parar</em>.</li></ul></div>
+      <div class="gitem"><h3>7. Comunicaciones VHF</h3>
+        <p>Usa las Frases Normalizadas de la OMI (SMCP) y identifica bien al otro buque por posición, rumbo o marcación.</p>
+        <ul><li>Ejemplo: "Buque en posición 6 millas al 045 de mí, rumbo 270, aquí buque X, canal 16".</li><li>No acuerdes por radio una maniobra que contradiga el Reglamento.</li><li>Confirma lo acordado y vigílalo en el radar.</li></ul></div>
+      <div class="gitem"><h3>8. Llamar al Capitán y anotar</h3>
+        <p>Llamar al Capitán a tiempo es buen criterio, no debilidad. Hazlo según sus órdenes permanentes y siempre que tengas duda.</p>
+        <ul><li>Visibilidad reducida, tráfico que preocupa, falla de equipo, desvío de la derrota, emergencia.</li><li>En la bitácora: hora, posición, evento, maniobra y resultado.</li></ul></div>
+      <div class="gitem"><h3>9. Emergencias que suelen poner</h3>
+        <ul><li><b>Hombre al agua:</b> timón a la banda del lado de la caída, aro salvavidas, botón MOB, alarma, Capitán, Williamson si no sabes cuándo cayó.</li><li><b>Falla de gobierno:</b> cambia a gobierno de emergencia, exhibe dos rojas todo horizonte (o dos esferas de día), avisa por VHF, evalúa fondear.</li><li><b>Incendio:</b> alarma general, Capitán y máquinas, pon el humo a sotavento, prepara mensaje de urgencia.</li><li><b>Falla de radar o GPS:</b> posición por otros medios, aumenta vigía, informa.</li></ul></div>
+      <div class="gitem"><h3>10. Errores que más restan</h3>
+        <ul><li>Caer a babor ante un buque por la proa.</li><li>Cruzar por la proa del buque al que cedes.</li><li>Maniobrar tarde o con cambios pequeños.</li><li>No reducir velocidad en niebla ni tocar la señal.</li><li>Fijarse en un solo blanco y olvidar a los demás.</li><li>Olvidar volver a la derrota o no verificar la posición.</li><li>Quedarse callada: piensa en voz alta, el evaluador necesita oír tu razonamiento.</li></ul></div>
+      <div class="gitem"><h3>11. Atraque</h3>
+        <p>Planea antes de empezar: qué banda va al muelle, de dónde viene el viento y la corriente, y qué te ayuda (hélice de proa, remolcador, efecto de la hélice).</p>
+        <ul><li>Con hélice dextrógira de paso fijo, al dar atrás la popa cae a babor. Atracar babor al muelle aprovecha ese efecto.</li><li>Llega con un ángulo de 10 a 15° y poca velocidad: unos 3 nudos a 300 m y casi parado al final.</li><li>Vigila la velocidad lateral de proa y popa: el contacto con las defensas debe ser de 0.1 a 0.15 m/s o menos.</li><li>Con viento que te separa del muelle, aproxima más cerca y con más ángulo, usa empuje lateral y pasa los cabos rápido.</li><li>Informa a proa y popa la distancia al muelle y da las órdenes de cabos claras.</li></ul></div>
+      <div class="gitem"><h3>12. Desatraque y salida de puerto</h3>
+        <ul><li>Antes de largar: máquina probada, timón probado, VHF con Capitanía y autorización de salida.</li><li>Con viento que te pega al muelle: trabaja sobre el spring de proa, timón hacia el muelle y poca avante para abrir la popa. Luego larga el spring y da atrás.</li><li>No des mucha máquina sobre un cabo: se puede faltar (romper) y es peligroso para la gente de maniobra.</li><li>En México (IALA región B) al entrar dejas las rojas por estribor. Al salir, las rojas quedan por babor.</li><li>En canal angosto ve por tu lado de estribor (Regla 9) y respeta el límite de velocidad.</li><li>Práctico: escala por la banda de sotavento para darle abrigo. Lo habitual es de 6 a 8 nudos, pero la hoja de tu examen fija <b>máximo 3 nudos</b> para el desembarque: manda la hoja.</li></ul></div>
+      <div class="gitem"><h3>13. Fondeo</h3>
+        <ul><li>Revisa en la carta la profundidad, el tipo de fondo y el radio de borneo.</li><li>Ordena a proa preparar el ancla (desabozada y molinete listo) con tiempo.</li><li>Aproxima con proa a la corriente o al viento, el que domine. Deja caer el ancla casi parado o con poca arrancada atrás.</li><li>Arría cadena según profundidad y tiempo: como referencia de 4 a 6 veces la profundidad con buen tiempo, más con mal tiempo. Un grillete son 27.5 m.</li><li>Iza la bola de fondeo (de noche, luces de fondeo), informa a Capitanía y toma marcaciones para vigilar que no garree.</li></ul></div>
+      <div class="gitem"><h3>14. Cómo califica la hoja del examen</h3>
+        <p>A nivel operacional (Cuadro A-II/1 del STCW) no diseñas la maniobra: ejecutas las órdenes del Capitán o del práctico, vigilas, lees instrumentos y comunicas.</p>
+        <ul><li><b>3 tareas críticas</b>, las tres obligatorias: repetir y ejecutar exactamente las órdenes de timón y máquina sin invertir bandas, no distraerte de la vigilancia (Regla 5) y alertar de inmediato un blanco en rumbo de colisión o una falla.</li><li><b>28 criterios generales</b> en 7 secciones: mínimo 20 aciertos (71 %).</li><li>Ponderación: bitácora, maniobra de puerto, ayudas a la navegación, reglamentos y emergencias, 20 % cada una. Mínimo aprobatorio 80 %.</li><li>El examen se graba: cuentan el manejo de equipos y el tono de las comunicaciones.</li></ul></div>
+      <div class="gitem"><h3>15. Bitácora y formatos</h3>
+        <ul><li>Cada asiento lleva hora, lugar o posición, evento y resultado.</li><li>Del práctico la hoja exige tres horas: embarque, cuando confirma que no tiene duda de la Pilot Card y primera orden.</li><li>Anota también: condiciones meteorológicas al abrir la guardia, pruebas de equipo, rondín de protección (búsqueda de polizones), pláticas y zafarranchos, remolcadores firmes y largados, último cabo, cambios de rumbo y velocidad, fallas y desembarque del práctico.</li><li>Reporte de simulacros: buque, fecha, hora, lugar, tema, desarrollo y participantes con firma.</li></ul></div>
+      <div class="gitem"><h3>16. Banderas del Código Internacional</h3>
+        <ul><li><em>G</em> necesito práctico · <em>H</em> tengo práctico a bordo.</li><li><em>P</em> en puerto: el buque está por zarpar, todos a bordo.</li><li><em>Q</em> mi buque está sano y pido libre plática (a la llegada).</li><li><em>B</em> cargo, descargo o llevo mercancías peligrosas.</li><li><em>O</em> hombre al agua.</li></ul></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(()=>{
+const D2R=Math.PI/180;
+const norm=a=>((a%360)+360)%360;
+const sdiff=(a,b)=>{let d=norm(a)-norm(b);if(d>180)d-=360;if(d<=-180)d+=360;return d;};
+const vel=(c,s)=>({x:s*Math.sin(c*D2R),y:s*Math.cos(c*D2R)});
+const brgTo=(a,b)=>norm(Math.atan2(b.x-a.x,b.y-a.y)/D2R);
+const pad3=n=>String(Math.round(norm(n))%360).padStart(3,'0');
+const OWN_SPD=14;
+const ENGINE=[["Toda avante",14],["Media avante",10],["Poca avante",6],["Muy poca",3],["Parar",0]];
+const SIGNALS=[["1c","1 corta","Caigo a estribor"],["2c","2 cortas","Caigo a babor"],["3c","3 cortas","Máquina atrás"],["5c","5 cortas","Duda / no entiendo su maniobra"],["1L","1 larga","Niebla, con arrancada"]];
+
+const TYPES={
+  power:{label:"Buque de propulsión mecánica (>50 m)",L:1,mh2:true,vis:{mh:6,side:3,stern:3}},
+  powerS:{label:"Buque de propulsión mecánica (<50 m)",L:.6,mh2:false,vis:{mh:5,side:2,stern:2}},
+  sail:{label:"Buque de vela",L:.4,vis:{mh:3,side:2,stern:2}},
+  fish:{label:"Pesquero arrastrando",L:.45,vis:{mh:3,side:2,stern:2}},
+  nuc:{label:"Buque sin gobierno",L:.9,vis:{mh:3,side:3,stern:3}},
+  ram:{label:"Buque con capacidad de maniobra restringida",L:.7,vis:{mh:5,side:2,stern:2}}
+};
+
+// Coloca un blanco para que llegue a un punto de reunión con el buque propio en t minutos, con un CPA ≈ off
+function meet(course,speed,tMin,off){
+  const h=tMin/60, P={x:0,y:OWN_SPD*h}, vt=vel(course,speed), vo=vel(0,OWN_SPD);
+  const rv={x:vt.x-vo.x,y:vt.y-vo.y}, m=Math.hypot(rv.x,rv.y)||1;
+  return {x:P.x-vt.x*h + (-rv.y/m)*off, y:P.y-vt.y*h + (rv.x/m)*off, hdg:course, spd:speed};
+}
+
+const SCEN=[
+ {id:"cruce-er",title:"Cruce por estribor",tag:"day",kind:"giveway",range:12,
+  brief:"Navegas al 000° a 14 nudos, de día y con buena visibilidad. Un mercante aparece por tu amura de estribor y la marcación casi no cambia.",
+  targets:[{name:"A",type:"power",...meet(270,14,22,.15)}],
+  q:"¿Qué situación es y qué te corresponde?",
+  opts:["Cruce. Yo mantengo rumbo y velocidad y él pasa por mi popa.","Vuelta encontrada. Ambos caemos a estribor y pasamos babor con babor.","Cruce. Yo cedo el paso: maniobro temprano y paso por su popa."],ok:2,
+  why:"Regla 15: el buque que tiene al otro por su estribor se mantiene apartado y evita cruzar por su proa. Regla 16: maniobra temprana y amplia. Lo normal es caer a estribor de forma clara (30° o más) o reducir velocidad, y tocar 1 corta si están a la vista."},
+ {id:"vuelta",title:"Vuelta encontrada",tag:"night",kind:"headon",range:12,
+  brief:"Noche cerrada. Un buque viene casi de proa con rumbo opuesto. Le ves ambas luces de tope en línea y las dos luces de costado.",
+  targets:[{name:"A",type:"power",...meet(180,13,18,.1)}],
+  q:"Ves las dos luces de tope alineadas, roja y verde. ¿Qué haces?",
+  opts:["Caigo a estribor para pasar babor con babor y toco 1 corta.","Caigo a babor para pasar estribor con estribor y toco 2 cortas.","Mantengo rumbo y velocidad: él es quien debe maniobrar primero."],ok:0,
+  why:"Regla 14: en vuelta encontrada ambos caen a estribor y pasan babor con babor. Si ves los dos topes en línea o casi en línea y ambas luces de costado, estás en esta situación. En caso de duda, supón que sí lo estás."},
+ {id:"alcance",title:"Alcance",tag:"night",kind:"overtaking",range:6,
+  brief:"Noche. Delante tuyo, un poco a estribor, ves una sola luz blanca. Tu radar indica que es un buque más lento que va casi en tu mismo rumbo.",
+  targets:[{name:"A",type:"powerS",...meet(5,6,22,.1)}],
+  q:"Solo ves una luz blanca fija y te acercas. ¿Qué es y quién maniobra?",
+  opts:["Es un buque fondeado: no hace falta maniobrar, basta con pasarle a buena distancia por cualquier banda.","Es su luz de alcance. Yo alcanzo y debo mantenerme apartada hasta dejarlo atrás y claro.","Es su luz de alcance. Él debe apartarse de mi derrota porque es el más lento de los dos."],ok:1,
+  why:"Regla 13: el buque que alcanza se mantiene apartado del alcanzado, sin importar lo que digan otras reglas, hasta que esté pasado y claro. Si ves su luz de alcance (y no sus costados), lo estás alcanzando."},
+ {id:"mantiene",title:"Buque que mantiene",tag:"day",kind:"standon",range:12,
+  brief:"Día, buena visibilidad. Un buque se aproxima por tu amura de babor con marcación constante.",
+  targets:[{name:"A",type:"power",...meet(90,13,22,.1),script:"giveLate"}],
+  q:"El buque viene por tu babor. ¿Qué te corresponde?",
+  opts:["Yo cedo el paso: caigo a babor desde ahora para pasarle por la popa.","Reduzco la velocidad de inmediato por precaución y espero a que pase.","Mantengo rumbo y velocidad, vigilo, y si no maniobra toco 5 cortas."],ok:2,
+  why:"Regla 17(a)(i): el buque que sigue a rumbo mantiene rumbo y velocidad. Si el otro no actúa, Regla 34(d): 5 cortas. Puedes maniobrar cuando sea evidente que no lo hará, pero Regla 17(c): no caigas a babor por un buque que está por tu babor."},
+ {id:"niebla",title:"Niebla",tag:"fog",kind:"fog",range:12,
+  brief:"Visibilidad menor a media milla. Detectas por radar un eco por la amura de babor, cada vez más cerca. No hay contacto visual.",
+  targets:[{name:"A",type:"power",...meet(100,12,26,.15)}],
+  q:"Solo lo tienes por radar, por la proa del través a babor. ¿Qué haces?",
+  opts:["Velocidad de seguridad, señal de niebla, aviso al Capitán, y si maniobro evito caer a babor.","Mantengo rumbo y velocidad porque está por mi babor: también en niebla le toca ceder a él.","Caigo a babor para alejarme de él y aumento la velocidad para dejarlo claro cuanto antes."],ok:0,
+  why:"Regla 19: en visibilidad reducida no aplican las reglas de buque que cede y que mantiene. Regla 19(d): si el blanco está por la proa del través, evita caer a babor. Regla 35: 1 larga cada 2 minutos como máximo. Reduce velocidad y ten la máquina lista."},
+ {id:"pesquero",title:"Pesquero por babor",tag:"night",kind:"giveway",range:6,
+  brief:"Noche. Por tu amura de babor ves una luz verde sobre una blanca, más una luz de costado. Se mueve muy despacio.",
+  targets:[{name:"A",type:"fish",...meet(60,3,24,.1)}],
+  q:"Verde sobre blanca, por tu babor. ¿Quién maniobra?",
+  opts:["Es un pesquero arrastrando, pero yo mantengo rumbo y velocidad porque está por mi babor.","Es un pesquero arrastrando. Yo, buque de propulsión mecánica, debo apartarme.","Es una embarcación de práctico en servicio: reduzco y espero a que se acerque."],ok:1,
+  why:"Regla 26: verde sobre blanca es pesquero de arrastre (blanca sobre roja es práctico). Regla 18: el buque de propulsión mecánica se aparta del pesquero dedicado a la pesca, aunque esté por babor. Pásalo con holgura, porque puede llevar el aparejo largo por la popa."},
+ {id:"nuc",title:"Sin gobierno",tag:"night",kind:"giveway",range:12,
+  brief:"Noche. Por la proa, un poco a estribor, ves dos luces rojas una encima de la otra. El ARPA lo da casi parado.",
+  targets:[{name:"A",type:"nuc",...meet(200,1,26,.15)}],
+  q:"Dos rojas todo horizonte en vertical. ¿Qué es?",
+  opts:["Buque restringido por su calado. No le estorbo el paso.","Buque fondeado de más de 50 m. Le doy resguardo al pasar.","Buque sin gobierno. Me aparto de él con amplitud."],ok:2,
+  why:"Regla 27(a): dos luces rojas todo horizonte en vertical es buque sin gobierno (de día, dos esferas). Si tiene arrancada, además muestra luces de costado y de alcance. Regla 18: te apartas de él."},
+ {id:"multiple",title:"Situación múltiple",tag:"day",kind:"multi",range:12,
+  brief:"Día. Tres contactos al mismo tiempo: un mercante por estribor, un velero por babor y un pesquero por la proa. Tienes que resolverlo todo sin acercarte a menos de 1 milla de ninguno.",
+  targets:[{name:"A",type:"power",...meet(250,15,25,.3)},{name:"B",type:"sail",...meet(80,6,28,-.4)},{name:"C",type:"fish",...meet(180,2,30,.6)}],
+  q:"¿A quién le cedes el paso?",
+  opts:["A los tres: al mercante por Regla 15 y al velero y pesquero por Regla 18.","Solo al mercante, porque viene por estribor; el velero y el pesquero están por otras bandas.","Al mercante y al pesquero; el velero cede porque me tiene a mí por su estribor."],ok:0,
+  why:"Como buque de propulsión mecánica cedes al que cruza por tu estribor (Regla 15) y te apartas del velero y del pesquero (Regla 18). Prioriza por CPA y TCPA. A menudo la mejor solución es reducir velocidad o una caída amplia que deje a todos claros."},
+ {id:"draga",title:"Draga trabajando",tag:"night",kind:"giveway",range:6,
+  brief:"Noche. Por la proa, un poco a babor, ves tres luces todo horizonte en vertical: roja, blanca y roja. Avanza muy despacio.",
+  targets:[{name:"A",type:"ram",...meet(30,2,24,.15)}],
+  q:"Roja, blanca y roja en vertical. ¿Qué es y qué haces?",
+  opts:["Un buque fondeado de gran eslora. Sigo igual y le doy resguardo al pasar.","Un buque con capacidad de maniobra restringida, como una draga. Me aparto de él.","Un remolcador con remolque largo. Él debe apartarse de mi derrota."],ok:1,
+  why:"Regla 27(b): roja, blanca y roja todo horizonte en vertical es buque con capacidad de maniobra restringida (de día: bola, bicono y bola). Regla 18: el buque de propulsión mecánica se aparta de él. Si está dragando, además muestra dos rojas del lado obstruido y dos verdes del lado por donde puedes pasar (Regla 27(d))."}
+];
+
+const radar=document.getElementById('radar'), rctx=radar.getContext('2d');
+const view=document.getElementById('view'), vctx=view.getContext('2d');
+const $=id=>document.getElementById(id);
+
+let S=null, accel=10, last=0, audio=null;
+
+function load(idx){
+  const sc=SCEN[idx];
+  S={idx,sc,t:0,rangeNm:sc.range,running:false,started:false,ended:false,sel:0,
+     own:{x:0,y:0,hdg:0,spd:OWN_SPD,ordHdg:0,ordSpd:OWN_SPD},
+     targets:sc.targets.map(t=>({...t,ordHdg:t.hdg,trail:[],hist:[],minD:Infinity,done:false})),
+     log:[],signals:[],trailT:0,histT:0,quiz:null,
+     ev:{first:null,minDelta:0,maxDelta:0,minSpd:OWN_SPD,portAt:null,lastFog:null}};
+  document.querySelectorAll('.chip').forEach((c,i)=>c.setAttribute('aria-pressed',i===idx?'true':'false'));
+  addLog(`Escenario: ${sc.title}. Rumbo 000°, ${OWN_SPD} kn.`);
+  renderBrief(); renderEngine(); updatePanels(); draw();
+}
+
+function clock(){
+  const base=S.sc.tag==="night"?2*60:(S.sc.tag==="fog"?6*60+30:10*60);
+  const m=base+S.t, h=Math.floor(m/60)%24, mm=Math.floor(m%60), ss=Math.floor((m*60)%60);
+  return `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+function addLog(txt){S.log.push({t:clock().slice(0,5),txt});renderLog();}
+function renderLog(){
+  $('log').innerHTML=S.log.slice().reverse().map(l=>`<div><span>${l.t}</span>${l.txt}</div>`).join('');
+}
+
+function arpa(t){
+  const o=S.own, rx=t.x-o.x, ry=t.y-o.y, rng=Math.hypot(rx,ry);
+  const vo=vel(o.hdg,o.spd), vt=vel(t.hdg,t.spd), rvx=vt.x-vo.x, rvy=vt.y-vo.y, v2=rvx*rvx+rvy*rvy;
+  let tH=v2<1e-6?Infinity:-(rx*rvx+ry*rvy)/v2;
+  const cpa=isFinite(tH)?Math.hypot(rx+rvx*tH,ry+rvy*tH):rng;
+  return {rng,brg:brgTo(o,t),cpa,tcpa:tH*60,rel:norm(brgTo(o,t)-o.hdg)};
+}
+
+// ---------- simulación ----------
+function step(dt){ // dt en minutos
+  const o=S.own;
+  const rot=Math.min(30,2+2.2*o.spd)*dt;
+  const dh=sdiff(o.ordHdg,o.hdg);
+  o.hdg=norm(o.hdg+Math.max(-rot,Math.min(rot,dh)));
+  if(o.spd<o.ordSpd)o.spd=Math.min(o.ordSpd,o.spd+1.0*dt); else if(o.spd>o.ordSpd)o.spd=Math.max(o.ordSpd,o.spd-1.6*dt);
+  const vo=vel(o.hdg,o.spd); o.x+=vo.x*dt/60; o.y+=vo.y*dt/60;
+  for(const t of S.targets){
+    const a=arpa(t);
+    if(t.script==="giveLate"&&!t.done&&a.tcpa>0&&a.tcpa<=9&&a.cpa<.8){t.ordHdg=norm(t.hdg+60);t.done=true;addLog(`Blanco ${t.name} cae a estribor (tarde).`);}
+    const td=sdiff(t.ordHdg,t.hdg), tr=25*dt; t.hdg=norm(t.hdg+Math.max(-tr,Math.min(tr,td)));
+    const vt=vel(t.hdg,t.spd); t.x+=vt.x*dt/60; t.y+=vt.y*dt/60;
+    const a2=arpa(t); if(a2.rng<t.minD)t.minD=a2.rng;
+  }
+  S.t+=dt;
+  // seguimiento para evaluación (rumbo ordenado = decisión)
+  const ev=S.ev, delta=sdiff(o.ordHdg,0);
+  ev.minDelta=Math.min(ev.minDelta,delta); ev.maxDelta=Math.max(ev.maxDelta,delta); ev.minSpd=Math.min(ev.minSpd,o.spd);
+  if(!ev.first&&(Math.abs(delta)>=10||o.ordSpd<=OWN_SPD-4)){
+    ev.first={t:S.t,type:Math.abs(delta)>=10?(delta>0?'stbd':'port'):'speed',tcpa:S.targets.map(t=>arpa(t).tcpa),rng:S.targets.map(t=>arpa(t).rng)};
+  }
+  if(!ev.portAt&&delta<=-10){ev.portAt={t:S.t,rel:S.targets.map(t=>arpa(t).rel),tcpa:S.targets.map(t=>arpa(t).tcpa)};}
+  S.trailT+=dt; if(S.trailT>=.5){S.trailT=0;for(const t of S.targets){t.trail.push({x:t.x,y:t.y});if(t.trail.length>16)t.trail.shift();}}
+  S.histT+=dt; if(S.histT>=.25){S.histT=0;for(const t of S.targets){t.hist.push({t:S.t,brg:arpa(t).brg});if(t.hist.length>30)t.hist.shift();}}
+  // fin
+  let all=true;
+  for(const t of S.targets){const a=arpa(t);
+    if(a.rng<.1){end('collision',t);return;}
+    if(!((a.tcpa<0&&a.rng>1.5)||a.rng>14))all=false;}
+  if(all&&S.t>3){end('clear');return;}
+  if(S.t>60)end('time');
+}
+
+function loop(ts){
+  const dtReal=last?Math.min(.1,(ts-last)/1000):0; last=ts;
+  if(window.__mode!=='colreg'){last=0;requestAnimationFrame(loop);return;}
+  if(S&&S.running&&!S.ended){
+    let rem=dtReal*accel/60; while(rem>0&&!S.ended){const d=Math.min(.05,rem);step(d);rem-=d;}
+    updatePanels();
+  }
+  draw(); requestAnimationFrame(loop);
+}
+
+// ---------- evaluación ----------
+function end(reason,tgt){
+  S.ended=true;S.running=false;
+  addLog(reason==='collision'?`ABORDAJE con blanco ${tgt.name}.`:reason==='time'?'Fin por tiempo.':'Todos los blancos pasados y claros.');
+  const sc=S.sc, ev=S.ev, C=[];
+  const add=(st,txt,rule)=>C.push({st,txt,rule});
+  const sig=k=>S.signals.some(s=>s.k===k);
+  if(reason==='collision') add('fail',`Abordaje con el blanco ${tgt.name}. La distancia bajó de 0.1 mn.`,'Reglas 7, 8 y 16');
+  const minAll=Math.min(...S.targets.map(t=>t.minD));
+  const thr=sc.kind==='overtaking'?[.8,.4]:sc.kind==='standon'?[.8,.4]:[1,.5];
+  S.targets.forEach(t=>{const d=t.minD;
+    add(d>=thr[0]?'ok':d>=thr[1]?'warn':'fail',`Distancia mínima con ${t.name}: ${d.toFixed(2)} mn${d>=thr[0]?'. Paso seguro.':d>=thr[1]?'. Aceptable pero justa, el evaluador suele pedir más margen.':'. Aproximación excesiva.'}`,'Regla 8(d)');});
+  const f=ev.first, ft=f?f.tcpa[0]:null;
+  const turnSignals=()=>{ if(sc.tag==='fog')return;
+    if(ev.maxDelta>=10) add(sig('1c')?'ok':'warn',sig('1c')?'Tocaste 1 corta al caer a estribor.':'Caíste a estribor a la vista de otro buque sin tocar 1 corta.','Regla 34(a)');
+    if(ev.minDelta<=-10) add(sig('2c')?'ok':'warn',sig('2c')?'Tocaste 2 cortas al caer a babor.':'Caíste a babor a la vista de otro buque sin tocar 2 cortas.','Regla 34(a)');};
+  const backToCourse=()=>{ if(Math.abs(ev.maxDelta)>=10||Math.abs(ev.minDelta)>=10){
+    const now=Math.abs(sdiff(S.own.ordHdg,0));
+    add(now<=10?'ok':'warn',now<=10?'Volviste a tu rumbo después de dejar al blanco claro.':'Al terminar seguías fuera de tu rumbo. Cuando el blanco esté pasado y claro, regresa a la derrota y dilo en voz alta.','Buena práctica / Regla 8(d)');}};
+  const earlySubstantial=(label)=>{
+    if(!f) add('fail','No hiciste ninguna maniobra clara.',label);
+    else { add(ft>=10?'ok':ft>=6?'warn':'fail',`Primera maniobra con TCPA de ${Math.max(0,ft).toFixed(1)} min${ft>=10?': temprana.':ft>=6?': algo tardía, conviene actuar antes (con 10 a 12 min de margen o más).':': tardía.'}`,'Regla 16');
+      const big=Math.max(Math.abs(ev.minDelta),Math.abs(ev.maxDelta))>=30||ev.minSpd<=OWN_SPD*.5;
+      add(big?'ok':'warn',big?'La maniobra fue amplia y evidente.':'Cambios pequeños. Una caída de 30° o más, o una reducción fuerte de velocidad, se ve mejor en el radar del otro.','Regla 8(b)');}};
+  if(sc.kind==='giveway'||sc.kind==='multi'){
+    earlySubstantial('Regla 16');
+    if(ev.portAt) add('fail','Caíste a babor con un buque por la proa. Eso suele cruzarte por su proa o acercarte a él.','Reglas 15, 17(c) y buena práctica');
+    else if(f&&f.type==='stbd') add('ok','Caíste a estribor para pasar por su popa.','Regla 15');
+    else if(f&&f.type==='speed') add('ok','Resolviste reduciendo velocidad, maniobra válida y evidente.','Regla 8(e)');
+    turnSignals(); backToCourse();
+  } else if(sc.kind==='headon'){
+    earlySubstantial('Regla 16');
+    add(f&&f.type==='stbd'?'ok':f&&f.type==='port'?'fail':'warn',f&&f.type==='stbd'?'Caíste a estribor como indica la vuelta encontrada.':f&&f.type==='port'?'Caíste a babor en vuelta encontrada. Ambos deben caer a estribor.':'En vuelta encontrada lo esperado es caer a estribor.','Regla 14');
+    turnSignals(); backToCourse();
+  } else if(sc.kind==='overtaking'){
+    earlySubstantial('Regla 13');
+    add('ok','Como buque que alcanza, la responsabilidad de apartarse es tuya hasta dejarlo claro.','Regla 13');
+    turnSignals(); backToCourse();
+  } else if(sc.kind==='standon'){
+    if(f&&ft>12) add('warn',`Maniobraste con TCPA de ${ft.toFixed(1)} min. Como buque que mantiene, primero conservas rumbo y velocidad. Maniobrar antes puede confundir al que cede.`,'Regla 17(a)(i)');
+    else if(f) add('ok',`Esperaste y actuaste con TCPA de ${Math.max(0,ft).toFixed(1)} min, cuando ya era evidente.`,'Regla 17(a)(ii) / 17(b)');
+    else add('ok','Mantuviste rumbo y velocidad.','Regla 17(a)(i)');
+    if(ev.portAt) add('fail','Caíste a babor con el buque por tu babor. Es justo lo que prohíbe la regla.','Regla 17(c)');
+    add(sig('5c')?'ok':'warn',sig('5c')?'Tocaste 5 cortas para indicar duda.':'Cuando el otro no maniobra a tiempo, toca 5 cortas y llámalo por VHF.','Regla 34(d)');
+  } else if(sc.kind==='fog'){
+    add(ev.minSpd<=9?'ok':'fail',ev.minSpd<=9?`Redujiste a velocidad de seguridad (mínima ${ev.minSpd.toFixed(1)} kn).`:'No redujiste la velocidad en visibilidad reducida.','Reglas 6 y 19(b)');
+    const n=S.signals.filter(s=>s.k==='1L').length, need=Math.max(1,Math.floor(S.t/2)-1);
+    add(n>=need?'ok':n>0?'warn':'fail',n>=need?`Señal de niebla tocada ${n} veces.`:n>0?`Tocaste la señal de niebla ${n} veces; debe ser cada 2 minutos como máximo.`:'No tocaste la señal de niebla.','Regla 35(a)');
+    if(ev.portAt) add('fail','Caíste a babor con un blanco por la proa del través.','Regla 19(d)(i)');
+    else add('ok','No caíste a babor hacia el blanco de proa.','Regla 19(d)(i)');
+    if(sig('1c')||sig('2c')) add('warn','Las señales de maniobra (1 o 2 cortas) son para buques a la vista. En niebla usa la señal de niebla.','Regla 34(a) / 35');
+  }
+  const fails=C.filter(c=>c.st==='fail').length, warns=C.filter(c=>c.st==='warn').length;
+  S.result={C,verdict:fails?'bad':warns?'warn':'ok',minAll};
+  renderBrief(); $('brief').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ---------- UI ----------
+function renderChips(){
+  $('chips').innerHTML=SCEN.map((s,i)=>`<button class="chip" data-i="${i}"><small>${String(i+1).padStart(2,'0')}</small>${s.title}</button>`).join('');
+  $('chips').onclick=e=>{const b=e.target.closest('.chip');if(b)load(+b.dataset.i);};
+}
+function tagHtml(tag){return tag==='night'?'<span class="tag night">Noche</span>':tag==='fog'?'<span class="tag fog">Niebla · vis &lt; 0.5 mn</span>':'<span class="tag day">Día · buena visibilidad</span>';}
+function renderBrief(){
+  const sc=S.sc, b=$('brief');
+  if(S.result){
+    const r=S.result, map={ok:['verdict-ok','Aprobado'],warn:['verdict-warn','Aprobado con observaciones'],bad:['verdict-bad','Reprobado: revisa los puntos en rojo']};
+    b.className='panel brief debrief';
+    b.innerHTML=`<div class="label">Evaluación · ${sc.title}</div><h2 class="${map[r.verdict][0]}">${map[r.verdict][1]}</h2>
+      <ul class="checks">${r.C.map(c=>`<li class="${c.st}"><span class="ic">${c.st==='ok'?'✓':c.st==='warn'?'!':'✗'}</span><div>${c.txt}<small>${c.rule}</small></div></li>`).join('')}</ul>
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="b-again">Repetir escenario</button>${S.idx<SCEN.length-1?'<button class="btn" id="b-next">Siguiente escenario</button>':''}</div>`;
+    $('b-again').onclick=()=>load(S.idx); const n=$('b-next'); if(n)n.onclick=()=>load(S.idx+1);
+    return;
+  }
+  b.className='panel brief';
+  const answered=S.quiz!==null;
+  b.innerHTML=`<div class="label">Escenario ${String(S.idx+1).padStart(2,'0')}</div><h2>${sc.title}</h2>
+    <div class="cond">${tagHtml(sc.tag)}<span class="tag">Propio: 000° · ${OWN_SPD} kn</span></div>
+    <p>${sc.brief}</p>
+    ${S.started?`<p class="kbd">Ejercicio en curso. Maniobra con el gobierno y el telégrafo. Termina cuando todos los blancos están pasados y claros.</p>`:`
+    <div class="label" style="margin-top:4px">${sc.q}</div>
+    <div class="quiz">${sc.opts.map((o,i)=>`<button class="qopt ${answered?(i===sc.ok?'right':i===S.quiz?'wrong':''):''}" data-q="${i}" ${answered?'disabled':''}>${o}</button>`).join('')}</div>
+    ${answered?`<div class="explain" style="margin-top:10px">${S.quiz===sc.ok?'<b>Correcto.</b> ':'<b>No es correcto.</b> '}${sc.why}</div>`:''}
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="b-start" ${answered?'':'disabled'}>Iniciar ejercicio</button>${answered?'':'<span class="kbd">Contesta para empezar</span>'}</div>`}`;
+  b.querySelectorAll('.qopt').forEach(q=>q.onclick=()=>{S.quiz=+q.dataset.q;renderBrief();});
+  const st=$('b-start'); if(st)st.onclick=()=>{S.started=true;S.running=true;addLog('Inicio del ejercicio.');renderBrief();$('b-pause').textContent='Pausa';};
+}
+function renderEngine(){
+  $('engine').innerHTML=ENGINE.map(([n,v])=>`<button class="btn" data-spd="${v}" aria-pressed="${S.own.ordSpd===v}">${n}<span class="kbd"> ${v} kn</span></button>`).join('');
+}
+function setSpd(v){ if(S.ended)return; if(S.own.ordSpd!==v){S.own.ordSpd=v;addLog(`Máquina: ${ENGINE.find(e=>e[1]===v)[0]} (${v} kn).`);} renderEngine(); }
+const logHdg=(h,d)=>addLog(`Gobierne al ${pad3(h)}° (${d>0?'a estribor':'a babor'} ${Math.abs(d)}°).`);
+function setHdg(h,quiet){ if(S.ended)return; h=norm(Math.round(h)); if(h!==S.own.ordHdg){const d=sdiff(h,S.own.ordHdg);S.own.ordHdg=h;if(!quiet)logHdg(h,d);} updatePanels(); }
+
+function playSignal(k){
+  try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+    const blasts=k==='1c'?[.5]:k==='2c'?[.5,.5]:k==='3c'?[.5,.5,.5]:k==='5c'?[.25,.25,.25,.25,.25]:[1.8];
+    let t=audio.currentTime+.02;
+    for(const d of blasts){const o=audio.createOscillator(),g=audio.createGain();o.type='sawtooth';o.frequency.value=150;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.08,t+.03);g.gain.setValueAtTime(.08,t+d-.05);g.gain.linearRampToValueAtTime(0,t+d);
+      o.connect(g).connect(audio.destination);o.start(t);o.stop(t+d+.02);t+=d+.35;}
+  }catch(e){}
+}
+
+function updatePanels(){
+  const o=S.own;
+  $('ro-time').textContent=clock(); $('ro-hdg').textContent=pad3(o.hdg)+'°'; $('ro-spd').textContent=o.spd.toFixed(1)+' kn'; $('ro-rng').textContent=S.rangeNm+' mn';
+  $('ord-hdg').textContent=pad3(o.ordHdg)+'°';
+  $('arpa').innerHTML=S.targets.map((t,i)=>{const a=arpa(t), al=a.cpa<1&&a.tcpa>0&&a.tcpa<30;
+    return `<tr class="${i===S.sel?'sel':''}" data-t="${i}"><td>${t.name}</td><td>${a.brg.toFixed(1)}°</td><td>${a.rng.toFixed(2)}</td><td class="${al?'alert':''}">${a.cpa.toFixed(2)}</td><td class="${al?'alert':''}">${a.tcpa<0?'--':isFinite(a.tcpa)?a.tcpa.toFixed(1):'--'}</td><td>${pad3(t.hdg)}°</td><td>${t.spd.toFixed(1)}</td></tr>`;}).join('');
+  const t=S.targets[S.sel];
+  if(t){ const a=arpa(t); let tr='';
+    const old=t.hist.find(h=>S.t-h.t<=3.2);
+    if(old&&S.t-old.t>1){const d=sdiff(a.brg,old.brg)/(S.t-old.t);
+      tr=Math.abs(d)<.4&&a.tcpa>0?'<b style="color:var(--bad)">casi constante</b> y la distancia baja: hay riesgo de abordaje (Regla 7(d)).':`cambia ${Math.abs(d).toFixed(1)}° por minuto hacia ${d>0?'la derecha':'la izquierda'}.`;}
+    else tr='midiendo…';
+    $('trend').innerHTML=`Blanco ${t.name} · ${TYPES[t.type].label}. Marcación ${tr}`; }
+}
+
+// ---------- dibujo: radar ----------
+function sizeCanvas(c){const r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(c.width!==w||c.height!==h){c.width=w;c.height=h;}return {w,h,dpr};}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+let COL={};
+function draw(){ if(!S)return; drawRadar(); drawView(); }
+function drawRadar(){
+  const {w,h,dpr}=sizeCanvas(radar), ctx=rctx, cx=w/2, cy=h/2, R=Math.min(w,h)/2-26*dpr, k=R/S.rangeNm, o=S.own;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#071017'; ctx.beginPath(); ctx.arc(cx,cy,R+18*dpr,0,7); ctx.fill();
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R); g.addColorStop(0,'#0e2028'); g.addColorStop(1,'#08141b');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+  const step=S.rangeNm/6; ctx.strokeStyle='rgba(102,201,216,.16)'; ctx.lineWidth=1*dpr;
+  for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(cx,cy,i*step*k,0,7);ctx.stroke();}
+  ctx.fillStyle='rgba(132,153,168,.9)'; ctx.font=`${10*dpr}px "IBM Plex Mono",monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let b=0;b<360;b+=10){const a=b*D2R,l=b%30===0?9:4;ctx.strokeStyle='rgba(132,153,168,.5)';ctx.beginPath();ctx.moveTo(cx+Math.sin(a)*R,cy-Math.cos(a)*R);ctx.lineTo(cx+Math.sin(a)*(R+l*dpr),cy-Math.cos(a)*(R+l*dpr));ctx.stroke();
+    if(b%30===0)ctx.fillText(pad3(b),cx+Math.sin(a)*(R+17*dpr),cy-Math.cos(a)*(R+17*dpr));}
+  ctx.textAlign='left'; ctx.fillStyle='rgba(132,153,168,.7)'; ctx.fillText(`${step} mn/anillo · Norte arriba · RM`,10*dpr,14*dpr);
+  // línea de proa
+  const ha=o.hdg*D2R; ctx.strokeStyle='rgba(215,225,231,.55)'; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.sin(ha)*R,cy-Math.cos(ha)*R); ctx.stroke();
+  // rumbo ordenado
+  if(Math.abs(sdiff(o.ordHdg,o.hdg))>.5){const oa=o.ordHdg*D2R;ctx.strokeStyle='rgba(242,169,59,.5)';ctx.setLineDash([4*dpr,5*dpr]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.sin(oa)*R*.6,cy-Math.cos(oa)*R*.6);ctx.stroke();ctx.setLineDash([]);}
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.clip();
+  const P=(x,y)=>[cx+(x-o.x)*k, cy-(y-o.y)*k];
+  // blancos
+  S.targets.forEach((t,i)=>{
+    const a=arpa(t), [px,py]=P(t.x,t.y), al=a.cpa<1&&a.tcpa>0&&a.tcpa<30, col=al?'#ff5f57':'#f2a93b';
+    ctx.fillStyle='rgba(242,169,59,.35)'; t.trail.forEach((p,j)=>{const [qx,qy]=P(p.x,p.y);ctx.beginPath();ctx.arc(qx,qy,(1+j/12)*dpr,0,7);ctx.fill();});
+    const v=vel(t.hdg,t.spd), vl=v.x*.1, vy=v.y*.1; // vector verdadero 6 min
+    ctx.strokeStyle=col; ctx.lineWidth=1.5*dpr; ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+vl*k,py-vy*k); ctx.stroke();
+    ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(px,py,4.5*dpr,3.2*dpr,t.hdg*D2R,0,7); ctx.fill();
+    ctx.strokeStyle=col; ctx.lineWidth=1*dpr; ctx.beginPath(); ctx.arc(px,py,9*dpr,0,7); ctx.stroke();
+    if(i===S.sel){ctx.strokeStyle='#d7e1e7';ctx.strokeRect(px-14*dpr,py-14*dpr,28*dpr,28*dpr);}
+    ctx.fillStyle=col; ctx.font=`600 ${12*dpr}px "Barlow Condensed",sans-serif`; ctx.fillText(t.name,px+13*dpr,py-11*dpr);
+  });
+  ctx.restore();
+  // propio
+  const vo=vel(o.hdg,o.spd); ctx.strokeStyle='#66c9d8'; ctx.lineWidth=1.5*dpr; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+vo.x*.1*k,cy-vo.y*.1*k); ctx.stroke();
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(ha); ctx.fillStyle='#66c9d8'; ctx.beginPath(); ctx.moveTo(0,-9*dpr); ctx.lineTo(4.5*dpr,5*dpr); ctx.lineTo(-4.5*dpr,5*dpr); ctx.closePath(); ctx.fill(); ctx.restore();
+  if(S.ended){ctx.fillStyle='rgba(9,18,26,.55)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#d7e1e7';ctx.font=`700 ${22*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText('EJERCICIO TERMINADO',cx,cy);}
+  else if(!S.running){ctx.fillStyle='rgba(215,225,231,.8)';ctx.font=`600 ${14*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText(S.started?'EN PAUSA':'CONTESTA LA PREGUNTA E INICIA',cx,cy+R*.82);}
+}
+
+// ---------- dibujo: vista desde el puente ----------
+function lightsFor(t,rel,rng){
+  const T=TYPES[t.type], L=[], fwd=rel<=112.5||rel>=247.5, stbd=rel<=112.5, port=rel>=247.5, stern=!fwd, mv=t.spd>.5;
+  const ok=k=>rng<=T.vis[k];
+  if(t.type==='power'||t.type==='powerS'){
+    if(fwd&&ok('mh')){L.push({d:.3,lat:0,h:.55,c:'#fff'}); if(T.mh2)L.push({d:-.18,lat:0,h:.85,c:'#fff'});}
+    if(mv&&stbd&&ok('side'))L.push({d:.12,lat:.11,h:.3,c:'#3dff7a'}); if(mv&&port&&ok('side'))L.push({d:.12,lat:-.11,h:.3,c:'#ff3b30'});
+    if(stern&&ok('stern'))L.push({d:-.5,lat:0,h:.3,c:'#fff'});
+  } else if(t.type==='sail'){
+    if(stbd&&ok('side'))L.push({d:.35,lat:.08,h:.22,c:'#3dff7a'}); if(port&&ok('side'))L.push({d:.35,lat:-.08,h:.22,c:'#ff3b30'});
+    if(stern&&ok('stern'))L.push({d:-.5,lat:0,h:.22,c:'#fff'});
+  } else if(t.type==='fish'){
+    if(ok('mh')){L.push({d:.05,lat:0,h:.85,c:'#3dff7a'});L.push({d:.05,lat:0,h:.68,c:'#fff'});}
+    if(mv&&stbd&&ok('side'))L.push({d:.2,lat:.1,h:.3,c:'#3dff7a'}); if(mv&&port&&ok('side'))L.push({d:.2,lat:-.1,h:.3,c:'#ff3b30'});
+    if(mv&&stern&&ok('stern'))L.push({d:-.5,lat:0,h:.3,c:'#fff'});
+  } else if(t.type==='nuc'){
+    if(ok('mh')){L.push({d:0,lat:0,h:.85,c:'#ff3b30'});L.push({d:0,lat:0,h:.68,c:'#ff3b30'});}
+    if(mv&&stbd&&ok('side'))L.push({d:.15,lat:.11,h:.3,c:'#3dff7a'}); if(mv&&port&&ok('side'))L.push({d:.15,lat:-.11,h:.3,c:'#ff3b30'});
+    if(mv&&stern&&ok('stern'))L.push({d:-.5,lat:0,h:.3,c:'#fff'});
+  } else if(t.type==='ram'){
+    if(ok('mh')){L.push({d:0,lat:0,h:.95,c:'#ff3b30'});L.push({d:0,lat:0,h:.8,c:'#fff'});L.push({d:0,lat:0,h:.65,c:'#ff3b30'});}
+    if(mv&&fwd&&ok('mh'))L.push({d:.3,lat:0,h:.5,c:'#fff'});
+    if(mv&&stbd&&ok('side'))L.push({d:.15,lat:.11,h:.3,c:'#3dff7a'}); if(mv&&port&&ok('side'))L.push({d:.15,lat:-.11,h:.3,c:'#ff3b30'});
+    if(mv&&stern&&ok('stern'))L.push({d:-.5,lat:0,h:.3,c:'#fff'});
+  }
+  return L;
+}
+function aspectText(rel){
+  if(rel<=15||rel>=345)return 'Lo ves <b>de proa</b>, viene hacia ti.';
+  if(rel<112.5)return 'Le ves la <b>banda de estribor</b> (verde).';
+  if(rel<=247.5)return 'Le ves la <b>popa</b>, va alejándose en su rumbo.';
+  return 'Le ves la <b>banda de babor</b> (roja).';
+}
+function drawView(){
+  const {w,h,dpr}=sizeCanvas(view), ctx=vctx, t=S.targets[S.sel]; if(!t)return;
+  const a=arpa(t), rel=norm(brgTo(t,S.own)-t.hdg), tag=S.sc.tag, hy=h*.7, cx=w/2;
+  ctx.clearRect(0,0,w,h);
+  if(tag==='fog'){
+    const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#5d666c');g.addColorStop(1,'#3c4449');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#e3e8eb';ctx.font=`600 ${15*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText(a.rng>.5?'SIN CONTACTO VISUAL · SOLO RADAR':'¡A LA VISTA EN LA NIEBLA!',cx,h/2);
+    $('aspect').innerHTML=`Marcación relativa ${pad3(a.rel)}° · ${a.rng.toFixed(2)} mn. En niebla dependes del radar y de oír sus señales.`; return;
+  }
+  const night=tag==='night';
+  if(night){ctx.fillStyle='#03060b';ctx.fillRect(0,0,w,h);ctx.fillStyle='#070d14';ctx.fillRect(0,hy,w,h-hy);}
+  else {const g=ctx.createLinearGradient(0,0,0,hy);g.addColorStop(0,'#7fa6c4');g.addColorStop(1,'#c9dbe6');ctx.fillStyle=g;ctx.fillRect(0,0,w,hy);ctx.fillStyle='#2f5a73';ctx.fillRect(0,hy,w,h-hy);}
+  ctx.strokeStyle=night?'rgba(120,150,170,.18)':'rgba(255,255,255,.35)';ctx.lineWidth=1*dpr;ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(w,hy);ctx.stroke();
+  const T=TYPES[t.type], sc=Math.max(16,Math.min(150,330/(a.rng+.8)))*dpr, s=Math.sin(rel*D2R), c=Math.cos(rel*D2R);
+  const X=(d,lat)=>cx+(d*s-lat*c)*T.L*sc;
+  if(!night&&a.rng<10){
+    const bx=X(.5,0), sx=X(-.5,0), w2=Math.max(Math.abs(bx-sx),T.L*sc*.22)/2, mx=(bx+sx)/2, hh=.13*sc;
+    ctx.fillStyle='#22303b';ctx.beginPath();ctx.moveTo(mx-w2,hy-hh);ctx.lineTo(mx+w2,hy-hh);ctx.lineTo(mx+w2*.85,hy);ctx.lineTo(mx-w2*.85,hy);ctx.closePath();ctx.fill();
+    if(t.type==='power'||t.type==='powerS'){const ax=X(-.32,0),bw=Math.max(T.L*sc*.12,w2*.35);ctx.fillRect(ax-bw/2,hy-.42*sc,bw,.3*sc);}
+    const mxs=X(t.type==='sail'?.05:0,0);ctx.strokeStyle='#22303b';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(mxs,hy-hh);ctx.lineTo(mxs,hy-.95*sc);ctx.stroke();
+    if(t.type==='sail'){ctx.fillStyle='rgba(245,245,240,.95)';ctx.beginPath();ctx.moveTo(mxs,hy-.92*sc);ctx.lineTo(mxs+(Math.abs(s)>.3?Math.sign(-s)*.3*sc*Math.abs(s)+ .05*sc:.06*sc),hy-hh-.02*sc);ctx.lineTo(mxs,hy-hh-.02*sc);ctx.closePath();ctx.fill();}
+    ctx.fillStyle='#111a22'; const r=.05*sc;
+    if(t.type==='fish'){const y1=hy-.88*sc;ctx.beginPath();ctx.moveTo(mxs-r,y1);ctx.lineTo(mxs+r,y1);ctx.lineTo(mxs,y1+r*1.6);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(mxs,y1+r*1.6);ctx.lineTo(mxs-r,y1+r*3.2);ctx.lineTo(mxs+r,y1+r*3.2);ctx.closePath();ctx.fill();}
+    if(t.type==='nuc'){ctx.beginPath();ctx.arc(mxs,hy-.86*sc,r,0,7);ctx.fill();ctx.beginPath();ctx.arc(mxs,hy-.86*sc+r*2.6,r,0,7);ctx.fill();}
+    if(t.type==='ram'){const y0=hy-.9*sc;ctx.beginPath();ctx.arc(mxs,y0,r,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(mxs,y0+r*1.6);ctx.lineTo(mxs+r,y0+r*3.2);ctx.lineTo(mxs,y0+r*4.8);ctx.lineTo(mxs-r,y0+r*3.2);ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(mxs,y0+r*6.4,r,0,7);ctx.fill();}
+  }
+  if(night){
+    const L=lightsFor(t,rel,a.rng);
+    L.forEach(l=>{const x=X(l.d,l.lat),y=hy-l.h*sc,r=Math.max(2.2*dpr,.025*sc);const g=ctx.createRadialGradient(x,y,0,x,y,r*4);g.addColorStop(0,l.c);g.addColorStop(.25,l.c);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*4,0,7);ctx.fill();});
+    if(!L.length){ctx.fillStyle='rgba(215,225,231,.6)';ctx.font=`600 ${13*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText('Fuera del alcance de sus luces',cx,h*.4);}
+  }
+  ctx.fillStyle=night?'rgba(132,153,168,.8)':'rgba(17,26,34,.75)';ctx.font=`${10*dpr}px "IBM Plex Mono",monospace`;ctx.textAlign='left';
+  ctx.fillText(`Blanco ${t.name} · ${a.rng.toFixed(1)} mn`,8*dpr,14*dpr);
+  const side=a.rel<180?`${Math.round(a.rel)}° por estribor`:`${Math.round(360-a.rel)}° por babor`;
+  $('aspect').innerHTML=`Lo tienes a ${a.rel<3||a.rel>357?'proa':side}. ${aspectText(rel)}${night?'':' De día identifícalo por su silueta y marcas.'}`;
+}
+
+// ---------- eventos ----------
+$('accel').innerHTML=[1,10,30].map(v=>`<button class="btn" data-acc="${v}" aria-pressed="${v===accel}">×${v}</button>`).join('');
+$('accel').onclick=e=>{const b=e.target.closest('[data-acc]');if(!b)return;accel=+b.dataset.acc;$('accel').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));};
+$('signals').innerHTML=SIGNALS.map(([k,n,d])=>`<button class="btn" data-sig="${k}" title="${d}">${n}</button>`).join('');
+$('signals').onclick=e=>{const b=e.target.closest('[data-sig]');if(!b||S.ended)return;const k=b.dataset.sig;S.signals.push({k,t:S.t});playSignal(k);addLog(`Señal: ${SIGNALS.find(s=>s[0]===k)[1]} (${SIGNALS.find(s=>s[0]===k)[2].toLowerCase()}).`);};
+$('engine').onclick=e=>{const b=e.target.closest('[data-spd]');if(b)setSpd(+b.dataset.spd);};
+document.querySelectorAll('[data-turn]').forEach(b=>b.onclick=()=>setHdg(S.own.ordHdg+ +b.dataset.turn));
+$('b-steer').onclick=()=>{const v=parseInt($('in-hdg').value,10);if(!isNaN(v))setHdg(v);};
+$('in-hdg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('b-steer').click();}});
+$('b-back').onclick=()=>setHdg(0);
+$('b-range').onclick=()=>{const r=[3,6,12];S.rangeNm=r[(r.indexOf(S.rangeNm)+1)%3];updatePanels();};
+$('b-pause').onclick=()=>{if(!S.started||S.ended)return;S.running=!S.running;$('b-pause').textContent=S.running?'Pausa':'Continuar';};
+$('b-reset').onclick=()=>load(S.idx);
+$('arpa').onclick=e=>{const r=e.target.closest('tr');if(r){S.sel=+r.dataset.t;updatePanels();}};
+radar.addEventListener('click',e=>{
+  const rect=radar.getBoundingClientRect(),dpr=window.devicePixelRatio||1,mx=(e.clientX-rect.left)*dpr,my=(e.clientY-rect.top)*dpr;
+  const cx=radar.width/2,cy=radar.height/2,R=Math.min(radar.width,radar.height)/2-26*dpr,k=R/S.rangeNm;
+  let best=-1,bd=30*dpr; S.targets.forEach((t,i)=>{const px=cx+(t.x-S.own.x)*k,py=cy-(t.y-S.own.y)*k,d=Math.hypot(px-mx,py-my);if(d<bd){bd=d;best=i;}});
+  if(best>=0){S.sel=best;updatePanels();}
+});
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||window.__mode!=='colreg')return;
+  if(e.key==='ArrowLeft'){e.preventDefault();setHdg(S.own.ordHdg-5);}
+  else if(e.key==='ArrowRight'){e.preventDefault();setHdg(S.own.ordHdg+5);}
+  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();const i=ENGINE.findIndex(x=>x[1]===S.own.ordSpd);const j=Math.max(0,Math.min(ENGINE.length-1,i+(e.key==='ArrowUp'?-1:1)));setSpd(ENGINE[j][1]);}
+  else if(e.key===' '){e.preventDefault();$('b-pause').click();}
+});
+
+// rueda de gobierno (la dibuja el último <script>): cambia el rumbo ordenado, 3° de rueda = 1° de rumbo; al centro es el rumbo inicial 000°
+window.__colregWheel={min:-180,max:180,ratio:3,ok:()=>!S.ended,get:()=>sdiff(S.own.ordHdg,0),set:v=>setHdg(v,true),done:(a,b)=>{const d=Math.round(b-a);if(d&&!S.ended)logHdg(S.own.ordHdg,d);}};
+
+renderChips(); load(0); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+(()=>{
+// ======================= MODO MANIOBRA =======================
+const D2R=Math.PI/180, KN=0.5144;
+const norm=a=>((a%360)+360)%360;
+const sdiff=(a,b)=>{let d=norm(a)-norm(b);if(d>180)d-=360;if(d<=-180)d+=360;return d;};
+const pad3=n=>String(Math.round(norm(n))%360).padStart(3,'0');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const $=id=>document.getElementById(id);
+
+// Buque: 120 m × 20 m, coordenadas de casco (x a proa, y a estribor)
+const HULL=[[60,0],[45,10],[-55,10],[-60,7],[-60,-7],[-55,-10],[45,-10]];
+const SAMPLES=[[60,0],[52,5],[52,-5],[45,10],[45,-10],[20,10],[20,-10],[-10,10],[-10,-10],[-40,10],[-40,-10],[-55,10],[-55,-10],[-60,7],[-60,-7],[-60,0]];
+const TELE=[["Toda avante",1],["Media avante",.6],["Poca avante",.35],["Muy poca avante",.2],["Parar",0],["Muy poca atrás",-.2],["Poca atrás",-.35],["Media atrás",-.6],["Toda atrás",-1]];
+const RUDS=[-35,-20,-10,0,10,20,35];
+const ZOOMS=[.6,1,1.6,2.5,4,6.5,10];
+
+// ---------- Puerto ficticio (norte arriba, metros) ----------
+const LAND=[
+ {name:'el muelle',fender:true,pts:[[-1500,0],[-500,0],[-500,700],[-1500,700]]},
+ {name:'la orilla de la dársena',fender:false,pts:[[-1500,-700],[-100,-700],[-100,0],[-1500,0]]},
+ {name:'la orilla este',fender:false,pts:[[500,0],[1500,0],[1500,700],[500,700]]},
+ {name:'la orilla del canal',fender:false,pts:[[100,-700],[1500,-700],[1500,0],[100,0]]},
+ {name:'la orilla norte',fender:false,pts:[[-1500,700],[1500,700],[1500,1500],[-1500,1500]]},
+ {name:'la escollera oeste',fender:false,pts:[[-160,-1100],[-100,-1100],[-100,-700],[-160,-700]]},
+ {name:'la escollera este',fender:false,pts:[[100,-1100],[160,-1100],[160,-700],[100,-700]]}
+];
+const SHOALS=[
+ {pts:[[-1500,-2600],[-150,-2600],[-150,-1100],[-160,-1100],[-160,-700],[-1500,-700]]},
+ {pts:[[150,-2600],[1500,-2600],[1500,-700],[160,-700],[160,-1100],[150,-1100]]}
+];
+const BUOYS=[];
+[-1300,-1700,-2100,-2500].forEach((y,i)=>{BUOYS.push({x:140,y,c:'red',n:2*i+2});BUOYS.push({x:-140,y,c:'green',n:2*i+1});});
+BUOYS.push({x:0,y:-2950,c:'safe',n:'Recalada'});
+const MOORED={x:-488,y:580,h:0};
+const BERTH={x:-488,y:360};
+const ANCH={x:900,y:-3800,r:150};
+const PILOT={x:0,y:-2800,r:300};
+// Corriente de la hoja del examen: 0.4 kn hacia el 252°
+const ZCUR={x:.4*KN*Math.sin(252*D2R),y:.4*KN*Math.cos(252*D2R)};
+
+function toW(s,x,y){const sh=Math.sin(s.h*D2R),ch=Math.cos(s.h*D2R);return {x:s.x+x*sh+y*ch,y:s.y+x*ch-y*sh};}
+function hullW(s,pts){return (pts||HULL).map(p=>toW(s,p[0],p[1]));}
+function inPoly(p,pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];const ax=a.x??a[0],ay=a.y??a[1],bx=b.x??b[0],by=b.y??b[1];if(((ay>p.y)!==(by>p.y))&&(p.x<(bx-ax)*(p.y-ay)/(by-ay)+ax))c=!c;}return c;}
+function nearestOnPoly(p,pts){let best=null,bd=1e18;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];const ax=a.x??a[0],ay=a.y??a[1],bx=b.x??b[0],by=b.y??b[1];const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;let t=l2?((p.x-ax)*dx+(p.y-ay)*dy)/l2:0;t=clamp(t,0,1);const q={x:ax+dx*t,y:ay+dy*t},d=(q.x-p.x)**2+(q.y-p.y)**2;if(d<bd){bd=d;best=q;}}return {q:best,d:Math.sqrt(bd)};}
+function shipVel(s){const sh=Math.sin(s.h*D2R),ch=Math.cos(s.h*D2R);return {x:s.u*sh+s.v*ch,y:s.u*ch-s.v*sh};}
+function sog(){const v=shipVel(M.ship);return Math.hypot(v.x+M.cur.x,v.y+M.cur.y);}
+
+function baseShip(x,y,h,kn,n){return {x,y,h,u:kn*KN,v:0,r:0,rud:0,rudOrd:0,n,nOrd:n,delay:0,bt:0,tug:0};}
+function mkLine(s,name,sx,sy,bx,by,k,max){const p=toW(s,sx,sy);return {name,sx,sy,bx,by,L0:Math.hypot(bx-p.x,by-p.y)+.4,k:k||.004,c:.05,max:max||.02,on:true,broken:false,T:0,dPrev:null};}
+
+const MSCEN=[
+ {id:'atraque',title:'Atraque',
+  brief:'Estás dentro de la dársena a 3.5 nudos, a unos 330 m del puesto. Atraca babor al muelle oeste, en el puesto marcado con línea punteada, sin golpear al buque amarrado por delante. Sin viento ni corriente. Tienes hélice de proa.',
+  q:'Tu hélice es dextrógira (gira a la derecha avante). Al dar atrás para parar el buque, ¿qué hace la popa?',
+  opts:['Cae a estribor, alejándose del muelle, y la proa se cierra a babor.','Cae a babor, hacia el muelle, y la proa se abre a estribor.','No cae a ninguna banda: el efecto solo se nota al dar avante.'],ok:1,
+  why:'Efecto evolutivo: con hélice dextrógira de paso fijo, al dar atrás la popa cae a babor. Por eso atracar babor al muelle es más cómodo: llegas con 10 a 15° de ángulo, y la atrás final frena el buque, acerca la popa al muelle y lo deja paralelo.',
+  setup:()=>({ship:baseShip(-260,120,330,3.5,.2),wind:{from:0,kn:0},cur:{x:0,y:0},zoom:2,berth:true}),
+  extras:['bt','finish']},
+ {id:'atraque-viento',title:'Atraque con viento',
+  brief:'Mismo puesto, pero sopla viento del oeste a 18 nudos: te separa del muelle. Tienes hélice de proa y un remolcador por la aleta de babor que puede empujarte hacia el muelle.',
+  q:'Con viento que sopla del muelle hacia afuera, ¿cómo conviene aproximarse?',
+  opts:['Paralelo al muelle y a buena distancia, con poca arrancada, y dejar que la hélice de proa y el remolcador hagan todo el trabajo.','Igual que sin viento, pero llegando con más velocidad para que el viento tenga menos tiempo de abatir el buque antes de pasar cabos.','Más cerca y con más ángulo, y usar hélice de proa y remolcador para llevar el buque al muelle; pasar los cabos rápido.'],ok:2,
+  why:'El viento abatirá el buque hacia afuera en cuanto pierdas velocidad. Aproxima más cerca y con algo más de ángulo, usa el empuje lateral (hélice de proa y remolcador) y ten la maniobra lista para pasar cabos de proa y popa en cuanto toques.',
+  setup:()=>({ship:baseShip(-260,120,330,3.5,.2),wind:{from:270,kn:18},cur:{x:0,y:0},zoom:2,berth:true,tug:true}),
+  extras:['bt','tug','finish']},
+ {id:'desatraque',title:'Desatraque con spring',
+  brief:'Estás atracado babor al muelle, proa al norte. Sopla viento del este a 15 nudos que te pega al muelle y hay un buque amarrado por tu proa. Sal al centro de la dársena con proa al sur, sin golpear nada.',
+  q:'El viento te pega al muelle. ¿Cómo separas el buque?',
+  opts:['Me quedo con el spring de proa, timón a la banda hacia el muelle y poca avante para abrir la popa. Luego largo el spring y doy atrás.','Largo todo y doy toda atrás con timón a la vía: con hélice dextrógira la popa cae sola hacia afuera y el buque se separa del muelle.','Largo todo, doy toda avante con timón a la banda hacia afuera y uso la hélice de proa para despegar antes de llegar al buque de proa.'],ok:0,
+  why:'Sobre el spring de proa el buque no avanza; la corriente de la hélice en el timón (metido hacia el muelle) abre la popa. Con 20 a 30° de ángulo largas el spring y das atrás. Ojo: con hélice dextrógira, al dar atrás la popa cae a babor, hacia el muelle; por eso necesitas suficiente ángulo antes de largar. No des mucha máquina sobre un cabo porque se falta.',
+  setup:()=>{const s=baseShip(-488,360,0,0,0);return {ship:s,wind:{from:90,kn:15},cur:{x:0,y:0},zoom:2,
+    lines:[mkLine(s,'Largo de proa',58,-6,-505,450),mkLine(s,'Spring de proa',40,-10,-505,340),mkLine(s,'Spring de popa',-40,-10,-505,380),mkLine(s,'Largo de popa',-58,-6,-505,270)]};},
+  extras:['bt','lines']},
+ {id:'salida',title:'Salida de puerto',
+  brief:'Sales de la dársena a 4 nudos rumbo sur con práctico a bordo. Pide autorización de salida antes de las escolleras, respeta 5 nudos dentro del puerto, ve por tu lado del canal y cruza con el buque que entra. Desembarca al práctico en la zona marcada a 3 nudos como máximo, que es lo que fija la hoja del examen, y pasa la boya de recalada. Viento del oeste a 12 nudos.',
+  q:'Saliendo de un puerto en México (IALA región B), ¿por qué banda dejas las boyas rojas?',
+  opts:['Por estribor.','Por babor.','Da igual.'],ok:1,
+  why:'En la región B el rojo va a estribor al entrar al puerto. Al salir es al revés: rojas por babor y verdes por estribor. En canal angosto navega por el lado de estribor del canal (Regla 9). Para el práctico: escala por la banda de sotavento; lo habitual es de 6 a 8 nudos, pero la hoja de tu examen fija máximo 3.',
+  setup:()=>({ship:baseShip(-30,80,180,4,.35),wind:{from:270,kn:12},cur:{x:0,y:0},zoom:4,
+    other:{x:60,y:-4300,h:0,spd:3.3,on:true}}),
+  extras:['bt','vhf-salida','pilot']},
+ {id:'mob',title:'Hombre al agua',
+  brief:'Mar abierto, rumbo 000 a 11 nudos. En unos segundos alguien caerá por la borda. Reacciona, haz la maniobra de Williamson y recupera a la persona: acércate a menos de 60 m con menos de 2 nudos para arriar el bote de rescate, sin pasarle cerca de la hélice.',
+  q:'Cae una persona por estribor. ¿Qué haces primero con el timón?',
+  opts:['Timón a la banda a babor, la contraria a la caída, para abrir la proa y volver más rápido.','Paro la máquina, dejo el timón a la vía y espero a que el buque pierda la arrancada.','Timón a la banda a estribor, hacia el lado de la caída, para alejar la popa y la hélice.'],ok:2,
+  why:'El timón hacia la banda de la caída aleja la popa y la hélice de la persona. Williamson: timón a la banda hasta desviarte unos 60° del rumbo original, luego timón a la banda contraria hasta quedar al rumbo opuesto; así vuelves por tu estela. Al mismo tiempo: aro salvavidas, marcar MOB en el GPS, alarma, avisar al Capitán y un vigía señalando a la persona sin perderla de vista.',
+  setup:()=>({ship:baseShip(3000,-6000,0,11,1),wind:{from:0,kn:0},cur:{x:0,y:0},zoom:4,open:true,mob:{t0:null}}),
+  extras:['mob']},
+ {id:'fondeo',title:'Fondeo',
+  brief:'Fondea en el centro del Fondeadero A (profundidad 22 m). Hay corriente que viene del sur a 0.8 nudos y viento del sur a 10 nudos. Prepara el ancla, déjala caer con poca o ninguna arrancada, arría la cadena adecuada, iza la bola e informa a Capitanía.',
+  q:'¿Con qué rumbo y arrancada conviene dejar caer el ancla?',
+  opts:['Proa a la corriente y al viento, casi parado o con un poco de arrancada atrás.','Avante a unos 5 nudos con viento y corriente por la popa, para que el ancla agarre.','Atravesado a la corriente y parado, para que el buque borne solo sobre la cadena.'],ok:0,
+  why:'Proa al elemento que domine (viento o corriente) y casi sin arrancada, o con poca atrás, para que la cadena se tienda sin amontonarse sobre el ancla. Luego arrías cadena según profundidad y tiempo. Fondear con arrancada avante puede dañar el molinete o hacer que el ancla no agarre.',
+  setup:()=>({ship:baseShip(-200,-3200,119,7,.6),wind:{from:180,kn:10},cur:{x:0,y:.8*KN},zoom:3,anchor:{}}),
+  extras:['bt','anchor']},
+ {id:'zarpe',title:'Zarpe del examen',
+  brief:'Las condiciones de la hoja del examen: atracada por estribor con cabos sencillos y proa al sur, viento del 020° a 19 nudos con rachas de 22 y corriente al 252° de 0.4 nudos. Tienes Remolcador 1 en proa y Remolcador 2 en popa por VHF 71. Pide la salida, confirma los remolcadores firmes, larga cabos, separa el buque y llévalo al eje del canal (a menos de 70 m), proa al sur y con los remolcadores largados. Tienes unos 300 m de agua por la proa: no alcanza para salir solo con máquina, gira primero la proa hacia el este con los remolcadores. Límite: 5 nudos. La orientación real del muelle Richmond no viene en la hoja; aquí el muelle queda al oeste.',
+  q:'Proa al sur y muelle por estribor. ¿Qué te hacen el viento del 020° y la corriente al 252°?',
+  opts:['Los dos me separan del muelle y el viento además me frena: basta con largar cabos y dejar que el buque se abra solo antes de dar avante.','Los dos me pegan al muelle y el viento además me empuja avante: necesito a los remolcadores tirando hacia afuera en proa y popa.','El viento me pega al muelle y la corriente me separa: se anulan, así que puedo salir solo con máquina y timón, sin remolcadores.'],ok:1,
+  why:'El viento del 020° sopla hacia el 200° y la corriente tira al 252°: los dos tienen componente hacia el oeste, donde está el muelle, y hacia el sur, que es tu proa. Para separar parejo tiran los dos remolcadores; si uno tira más, el buque gira. Con hélice dextrógira, al dar atrás la popa cae a babor, que aquí es hacia afuera del muelle. Pegado al muelle la corriente atravesada casi no se siente; crece conforme te separas.',
+  setup:()=>{const s=baseShip(-488,360,180,0,0);s.tug1=0;s.tug2=0;return {ship:s,wind:{from:20,kn:19},cur:{x:0,y:ZCUR.y},zoom:2,tugs:true,
+    lines:[mkLine(s,'Largo de proa',58,6,-505,270),mkLine(s,'Spring de proa',40,10,-505,380),mkLine(s,'Spring de popa',-40,10,-505,340),mkLine(s,'Largo de popa',-58,6,-505,450)]};},
+  extras:['bt','tugs2','lines','vhf-zarpe']}
+];
+
+let M=null, macc=2, mlast=0, mAudio=null;
+const plan=$('plan'), pctx=plan.getContext('2d');
+
+function mload(i){
+  const sc=MSCEN[i], st=sc.setup();
+  M={idx:i,sc,t:0,running:false,started:false,ended:false,quiz:null,result:null,
+     ship:st.ship,wind:st.wind,cur:st.cur,zoom:st.zoom,lines:st.lines||[],other:st.other||null,mob:st.mob||null,anchor:st.anchor||null,
+     berth:!!st.berth,tug:!!st.tug,tugs:!!st.tugs,open:!!st.open,log:[],banner:null,bannerT:0,
+     ev:{maxImpact:0,hard:0,lastHard:-99,sternHit:false,buoyHits:new Set(),broken:[],order:[],
+         at300:null,at100:null,usedBT:false,usedTug:false,
+         vhf:{},vhfY:{},spdInside:0,wrongSide:0,minOther:Infinity,pilot:null,
+         springAngle:null,startT:0,fail:null}};
+  document.querySelectorAll('#m-chips .chip').forEach((c,j)=>c.setAttribute('aria-pressed',j===i?'true':'false'));
+  $('m-banner').hidden=true;
+  mlog(`Escenario: ${sc.title}.`);
+  renderMBrief(); renderControls(); renderExtras(); mupdate(); drawPlan();
+}
+function mclock(){const m=8*60+M.t/60,h=Math.floor(m/60)%24,mm=Math.floor(m%60),ss=Math.floor(M.t%60);return `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;}
+function mlog(t){M.log.push({t:mclock(),txt:t});$('m-log').innerHTML=M.log.slice().reverse().map(l=>`<div><span>${l.t}</span>${l.txt}</div>`).join('');}
+function banner(t,sec){M.banner=t;M.bannerT=sec||6;const b=$('m-banner');b.textContent=t;b.hidden=false;}
+
+// ---------- física ----------
+function mstep(dt){
+  const s=M.ship;
+  // timón: 2.5°/s; máquina: 0.12/s con 4 s de arranque al invertir
+  s.rud+=clamp(s.rudOrd-s.rud,-2.5*dt,2.5*dt);
+  if(s.delay>0)s.delay-=dt; else {
+    let tgt=s.nOrd; if(s.n!==0&&tgt!==0&&Math.sign(tgt)!==Math.sign(s.n))tgt=0;
+    const prev=s.n; s.n+=clamp(tgt-s.n,-.12*dt,.12*dt); if(Math.abs(s.n)<1e-9)s.n=0;
+    if(prev!==0&&s.n===0&&s.nOrd!==0)s.delay=4;
+  }
+  const sh=Math.sin(s.h*D2R),ch=Math.cos(s.h*D2R);
+  const T=s.n>=0?Math.pow(s.n,1.5):-.75*Math.pow(-s.n,1.5);
+  let Fx=.03*T,Fy=0,N=0;
+  const wash=Math.max(0,s.u)+2.5*Math.max(0,s.n), sd=Math.sin(s.rud*D2R);
+  N+=.00224*sd*wash*wash;
+  if(s.u<0)N-=.3*.00224*sd*s.u*s.u;
+  if(s.n<0)N+=.0045*(-s.n)*(1-.5*Math.min(1,Math.abs(s.u)/3)); else N-=.0008*s.n*Math.max(0,1-s.u/3);
+  const eff=Math.max(0,1-Math.abs(s.u)/2.5);
+  if(s.bt){Fy+=.0025*s.bt*eff;N+=.04*50*.0025*s.bt*eff;}
+  if(M.tug&&s.tug){const f=.003*s.tug;Fy+=f;N+=.04*(-50)*f;}
+  if(M.tugs){const f1=.01*s.tug1,f2=.01*s.tug2;Fy+=f1+f2;N+=.04*45*(f1-f2);}
+  if(M.wind.kn){const a=(M.wind.from+180-s.h)*D2R,W2=M.wind.kn*M.wind.kn,fx=1.5e-6*W2*Math.cos(a),fy=4.6e-6*W2*Math.sin(a);Fx+=fx;Fy+=fy;N+=.04*(-10)*fy;}
+  const pull=(l)=>{const p=toW(s,l.sx,l.sy),dx=l.bx-p.x,dy=l.by-p.y,d=Math.hypot(dx,dy)||1e-6,ext=d-l.L0,rate=l.dPrev==null?0:(d-l.dPrev)/dt;l.dPrev=d;
+    if(ext<=0){l.T=0;return;} const Tn=Math.max(0,l.k*ext+l.c*rate); l.T=Tn;
+    if(Tn>l.max){l.broken=true;l.on=false;M.ev.broken.push(l.name);mlog(`Se faltó el ${l.name.toLowerCase()}.`);banner(`¡Se faltó el ${l.name.toLowerCase()}!`);return;}
+    const ux=dx/d,uy=dy/d,fbx=(ux*sh+uy*ch)*Tn,fby=(ux*ch-uy*sh)*Tn;Fx+=fbx;Fy+=fby;N+=.04*(l.sx*fby-l.sy*fbx);};
+  M.lines.forEach(l=>{if(l.on)pull(l);});
+  if(M.anchor&&M.anchor.chain)pull(M.anchor.chain);
+  s.u+=(Fx-.03*s.u*Math.abs(s.u)/36-.0008*s.u-.0004*Math.abs(s.r)*s.u)*dt;
+  s.v+=(Fy-.12*s.v*Math.abs(s.v)-.02*s.v)*dt;
+  s.r+=(N-.04*(.3+Math.abs(s.u)/6)*s.r)*dt;
+  let V=shipVel(s);
+  s.x+=(V.x+M.cur.x)*dt; s.y+=(V.y+M.cur.y)*dt; s.h=norm(s.h+s.r*dt);
+  M.t+=dt;
+  if(contacts())return;
+  scenarioTick(dt);
+}
+
+function failEnd(msg){M.ev.fail=msg;mlog(msg);banner(msg,30);mend();}
+function contacts(){
+  const s=M.ship, ev=M.ev;
+  if(!M.open){
+    const prevC=M.contact||new Set(), nowC=new Set(); M.contact=nowC;
+    for(const poly of LAND){
+      for(let i=0;i<SAMPLES.length;i++){
+        const sp=SAMPLES[i], p=toW(s,sp[0],sp[1]);
+        if(!inPoly(p,poly.pts))continue;
+        if(!poly.fender){failEnd(`Tocaste ${poly.name}. Varada o daño al casco.`);return true;}
+        const {q,d}=nearestOnPoly(p,poly.pts); if(d<1e-6)continue;
+        const nx=(q.x-p.x)/d, ny=(q.y-p.y)/d; s.x+=nx*d; s.y+=ny*d;
+        const V=shipVel(s), rr=s.r*D2R, ox=p.x-s.x, oy=p.y-s.y;
+        const vin=-((V.x+M.cur.x+rr*oy)*nx+(V.y+M.cur.y-rr*ox)*ny);
+        nowC.add(i);
+        if(vin>0){
+          if(vin>.03&&!prevC.has(i)){ev.maxImpact=Math.max(ev.maxImpact,vin);
+            if(vin>.3&&M.t-ev.lastHard>4){ev.hard++;ev.lastHard=M.t;mlog(`Golpe fuerte contra el muelle (${vin.toFixed(2)} m/s).`);banner('¡Golpe fuerte contra el muelle!',4);}}
+          if(sp[0]<=-55&&Math.abs(s.n)>.05&&!ev.sternHit){ev.sternHit=true;mlog('La popa tocó el muelle con la máquina en marcha: riesgo de dañar hélice y timón.');banner('¡Popa contra el muelle con máquina!',5);}
+          const cin=-(V.x*nx+V.y*ny);
+          if(cin>0){const cx=V.x+nx*cin,cy=V.y+ny*cin,sh=Math.sin(s.h*D2R),ch=Math.cos(s.h*D2R);s.u=cx*sh+cy*ch;s.v=cx*ch-cy*sh;}
+        }
+      }
+    }
+    for(const sh of SHOALS)for(const sp of SAMPLES){if(inPoly(toW(s,sp[0],sp[1]),sh.pts)){failEnd('Varada: saliste del canal y tocaste el bajo.');return true;}}
+    const hits=(o)=>{const oh=hullW(o);return SAMPLES.some(sp=>inPoly(toW(s,sp[0],sp[1]),oh))||oh.some(p=>inPoly(p,hullW(s)));};
+    if(Math.hypot(s.x-MOORED.x,s.y-MOORED.y)<130&&hits(MOORED)){failEnd('Abordaje con el buque amarrado.');return true;}
+    if(M.other&&M.other.on&&Math.hypot(s.x-M.other.x,s.y-M.other.y)<130&&hits(M.other)){failEnd('Abordaje con el buque que entraba.');return true;}
+    for(const b of BUOYS){if(ev.buoyHits.has(b.n))continue;const pts=hullW(s);if(inPoly(b,pts)||nearestOnPoly(b,pts).d<5){ev.buoyHits.add(b.n);mlog(`Tocaste la boya ${b.n}.`);banner(`¡Tocaste la boya ${b.n}!`,4);}}
+  }
+  return false;
+}
+
+function berthErr(){const s=M.ship;const pts=hullW(s);const minX=Math.min(...pts.map(p=>p.x));return {gap:minX-(-500),dy:s.y-BERTH.y,dh:sdiff(s.h,0)};}
+function latSpeeds(){const s=M.ship,rr=s.r*D2R,sh=Math.sin(s.h*D2R),ch=Math.cos(s.h*D2R),cl=M.cur.x*ch-M.cur.y*sh,cf=M.cur.x*sh+M.cur.y*ch;return {bow:s.v+rr*50+cl,stern:s.v-rr*50+cl,lon:s.u+cf};}
+
+function scenarioTick(dt){
+  const s=M.ship, ev=M.ev, id=M.sc.id;
+  if(M.bannerT>0){M.bannerT-=dt;if(M.bannerT<=0&&!M.ended)$('m-banner').hidden=true;}
+  if(M.berth){const d=Math.hypot(s.x-BERTH.x,s.y-BERTH.y),sp=sog()/KN;
+    if(ev.at300==null&&d<300)ev.at300=sp; if(ev.at100==null&&d<100)ev.at100=sp;}
+  if(id==='desatraque'){
+    const allOff=M.lines.every(l=>!l.on), clear=hullW(s).every(p=>p.x>-470);
+    if(allOff&&clear&&Math.abs(sdiff(s.h,180))<=30&&s.y<520&&s.y>60){mlog('Fuera del muelle con proa al sur.');mend('ok');}
+  }
+  if(id==='zarpe'){
+    // la corriente atravesada se anula contra el muelle y crece al separarse; el viento racha de 19 a 22 kn
+    M.cur.x=ZCUR.x*clamp(berthErr().gap/120,0,1); M.wind.kn=19+Math.round(3*Math.max(0,Math.sin(M.t/11)));
+    ev.spdInside=Math.max(ev.spdInside,sog()/KN);
+    if(M.lines.every(l=>!l.on)&&ev.vhf.libres&&Math.abs(s.x)<=70&&s.y>-650&&s.y<450&&Math.abs(sdiff(s.h,180))<=20){mlog('Buque en el eje, enfilado al canal.');mend('ok');}
+  }
+  if(id==='salida'){
+    const o=M.other;
+    if(o&&o.on){o.y+=o.spd*dt; if(o.y>-250)o.on=false;
+      const d=Math.hypot(s.x-o.x,s.y-o.y); if(d<ev.minOther)ev.minOther=d;
+      if(d<1200&&s.y<-1050&&s.y>-2700&&s.x>0)ev.wrongSide+=dt;}
+    if(s.y>-1100)ev.spdInside=Math.max(ev.spdInside,sog()/KN);
+    if(s.y<-3050){mlog('Pasaste la boya de recalada.');mend('ok');}
+  }
+  if(id==='mob'){
+    const mob=M.mob;
+    if(mob.t0==null&&M.t>=15&&M.started){mob.t0=M.t;mob.h0=s.h;const p=toW(s,-20,13);mob.p={x:p.x,y:p.y};banner('¡Hombre al agua por estribor!',8);mlog('¡Hombre al agua por estribor!');mAlarm();}
+    if(mob.t0!=null){
+      if(Math.abs(sdiff(s.h,mob.h0+180))<15)mob.recip=true;
+      const st=toW(s,-60,0); if(Math.hypot(st.x-mob.p.x,st.y-mob.p.y)<22&&Math.abs(s.n)>.05&&!mob.prop){mob.prop=true;mlog('La persona quedó cerca de la hélice con máquina en marcha.');banner('¡Persona cerca de la hélice!',4);}
+    }
+  }
+}
+
+function mobDist(){if(!M.mob||!M.mob.p)return Infinity;const pts=hullW(M.ship);return inPoly(M.mob.p,pts)?0:nearestOnPoly(M.mob.p,pts).d;}
+function canFinish(){
+  const id=M.sc.id;
+  if(M.berth){const e=berthErr(),l=latSpeeds();
+    return {ok:Math.abs(e.dh)<=6&&e.gap<=(M.tug?6:5)&&Math.abs(e.dy)<=30&&Math.abs(l.lon)<=.25&&Math.abs(l.bow)<=.2&&Math.abs(l.stern)<=.2,
+      why:`Necesitas: paralelo (±6°, ahora ${e.dh.toFixed(0)}°), a menos de ${M.tug?6:5} m del muelle (ahora ${Math.max(0,e.gap).toFixed(1)} m), dentro del puesto (±30 m, ahora ${e.dy>0?'+':''}${e.dy.toFixed(0)} m) y casi parado.`};}
+  if(id==='mob'){const d=mobDist(),v=sog()/KN;return {ok:M.mob.t0!=null&&d<=60&&v<=2,why:M.mob.t0==null?'Aún no cae nadie.':`Acércate a menos de 60 m (ahora ${isFinite(d)?d.toFixed(0):'--'} m) con menos de 2 kn (ahora ${v.toFixed(1)} kn).`};}
+  if(id==='fondeo'){const a=M.anchor;return {ok:!!a.shackles,why:a.shackles?'':'Primero deja caer el ancla y arría cadena.'};}
+  return {ok:false,why:''};
+}
+
+// ---------- evaluación ----------
+function mend(kind){
+  if(M.ended)return; M.ended=true; M.running=false;
+  const ev=M.ev, id=M.sc.id, C=[], add=(st,txt,rule)=>C.push({st,txt,rule}), s=M.ship;
+  if(ev.fail)add('fail',ev.fail,'Fin del ejercicio');
+  const impacts=()=>{ if(ev.maxImpact<=.03)add('ok','Sin golpes contra el muelle.','Buena práctica');
+    else add(ev.maxImpact<=.15?'ok':ev.maxImpact<=.3?'warn':'fail',`Contacto máximo con el muelle: ${ev.maxImpact.toFixed(2)} m/s${ev.maxImpact<=.15?', suave sobre las defensas.':ev.maxImpact<=.3?'. Algo fuerte; lo ideal es 0.15 m/s o menos.':'. Golpe fuerte, puede dañar defensas o casco.'}`,'Buena práctica de atraque');
+    if(ev.sternHit)add('fail','La popa tocó el muelle con la máquina en marcha. Riesgo de dañar hélice y timón.','Buena práctica');};
+  if(M.berth){
+    if(!ev.fail){const e=berthErr();add(Math.abs(e.dy)<=15?'ok':'warn',`Quedaste a ${Math.abs(e.dy).toFixed(0)} m del centro del puesto${Math.abs(e.dy)<=15?'.':'. El práctico o el agente esperan el buque en su posición; procura quedar a menos de 15 m.'}`,'Posicionamiento');
+      add('ok',`Ángulo final ${Math.abs(e.dh).toFixed(0)}° y separación ${Math.max(0,e.gap).toFixed(1)} m: listo para pasar cabos.`,'Posicionamiento');}
+    if(ev.at300!=null)add(ev.at300<=3.5?'ok':'warn',`Velocidad a 300 m del puesto: ${ev.at300.toFixed(1)} kn${ev.at300<=3.5?'.':'. Muy rápido; a esa distancia conviene ir a 3 nudos o menos.'}`,'Aproximación');
+    if(ev.at100!=null)add(ev.at100<=1.5?'ok':'warn',`Velocidad a 100 m del puesto: ${ev.at100.toFixed(1)} kn${ev.at100<=1.5?'.':'. Debías venir casi parado (1 a 1.5 kn o menos).'}`,'Aproximación');
+    impacts();
+    if(M.tug)add(ev.usedBT||ev.usedTug?'ok':'warn',ev.usedBT||ev.usedTug?'Usaste empuje lateral contra el viento.':'Con viento que separa del muelle necesitas empuje lateral (hélice de proa y remolcador).','Planeación de la maniobra');
+  }
+  if(id==='desatraque'){
+    if(ev.broken.length)add('fail',`Se faltó: ${ev.broken.join(', ').toLowerCase()}. Mucha máquina sobre un cabo es peligroso para la gente de maniobra.`,'Seguridad en la maniobra');
+    const last=ev.order[ev.order.length-1];
+    add(last==='Spring de proa'?'ok':'warn',last==='Spring de proa'?'El último cabo en largar fue el spring de proa: trabajaste sobre él.':'Con viento que te pega, conviene quedarte al final solo con el spring de proa y abrir la popa sobre él.','Técnica de desatraque');
+    if(ev.springAngle!=null)add(ev.springAngle>=15?'ok':'warn',`Al largar el spring la popa estaba abierta ${ev.springAngle.toFixed(0)}°${ev.springAngle>=15?'.':'. Poco ángulo: al dar atrás la popa cae a babor, hacia el muelle.'}`,'Efecto evolutivo');
+    impacts();
+    if(kind==='ok')add('ok','Saliste al centro de la dársena con proa al sur.','Objetivo');
+  }
+  if(id==='zarpe'){
+    const v=ev.vhf;
+    add(ev.authFirst?'ok':v.ctl?'warn':'fail',ev.authFirst?'Pediste la autorización de salida a Control de Tráfico antes de largar cabos.':v.ctl?'Pediste la autorización después de largar el primer cabo: debe ser antes de mover el buque.':'No pediste autorización de salida a Control de Tráfico.','Hoja del examen · criterio 2.1');
+    add(ev.tugsFirst?'ok':'warn',ev.tugsFirst?'Confirmaste los remolcadores firmes por VHF 71 antes de largar cabos.':'Largaste cabos sin confirmar que los remolcadores estuvieran firmes.','Hoja del examen · criterios 2.3 y 2.4');
+    if(ev.broken.length)add('fail',`Se faltó: ${ev.broken.join(', ').toLowerCase()}. Tirar con los remolcadores con cabos todavía firmes es peligroso para la gente de maniobra.`,'Seguridad en la maniobra');
+    impacts();
+    add(ev.spdInside<=5?'ok':ev.spdInside<=6.5?'warn':'fail',`Velocidad máxima sobre el fondo: ${ev.spdInside.toFixed(1)} kn${ev.spdInside<=5?'.':'. La hoja fija 5 nudos en el canal interior.'}`,'Hoja del examen');
+    if(kind==='ok')add('ok',`Quedaste en el eje del canal, proa al ${pad3(s.h)}°, con los remolcadores largados, a los ${(M.t/60).toFixed(0)} min.`,'Objetivo');
+    else if(!ev.fail)add('fail','No dejaste el buque enfilado al canal.','Objetivo');
+  }
+  if(id==='salida'){
+    const v=ev.vhf;
+    add(v.salida&&ev.vhfY.salida>-700?'ok':v.salida?'warn':'fail',v.salida&&ev.vhfY.salida>-700?'Pediste autorización de salida a Capitanía antes de las escolleras.':v.salida?'Pediste autorización, pero tarde: debe ser antes de mover el buque o de pasar las escolleras.':'No pediste autorización de salida a Capitanía.','Reglamento del puerto');
+    add(ev.spdInside<=5.2?'ok':ev.spdInside<=6.5?'warn':'fail',`Velocidad máxima dentro del puerto: ${ev.spdInside.toFixed(1)} kn${ev.spdInside<=5.2?'.':'. El límite era 5 nudos.'}`,'Hoja del examen / Regla 6');
+    if(isFinite(ev.minOther)){
+      add(ev.wrongSide<=10?'ok':ev.wrongSide<=60?'warn':'fail',ev.wrongSide<=10?'Navegaste por tu lado de estribor del canal al cruzar con el otro buque.':`Estuviste ${ev.wrongSide.toFixed(0)} s del lado equivocado del canal con el otro buque cerca.`,'Regla 9(a)');
+      add(ev.minOther>=80?'ok':ev.minOther>=40?'warn':'fail',`Distancia mínima con el buque que entraba: ${ev.minOther.toFixed(0)} m.`,'Regla 8 y 9');
+      add(v.entrante?'ok':'warn',v.entrante?'Coordinaste el cruce por VHF.':'Conviene coordinar por VHF el cruce en el canal (babor con babor).','SMCP / buena práctica');
+    }
+    const p=ev.pilot;
+    if(!p)add('fail','No desembarcaste al práctico.','Procedimiento');
+    else{add(p.inZone?'ok':'warn',p.inZone?'Desembarcaste al práctico en la zona designada.':'Desembarcaste al práctico fuera de la zona designada.','Procedimiento');
+      add(p.spd<=3?'ok':p.spd<=4?'warn':'fail',`Velocidad al desembarcar al práctico: ${p.spd.toFixed(1)} kn${p.spd<=3?'.':'. La hoja del examen fija máximo 3 nudos.'}`,'Hoja del examen');
+      add(p.lee?'ok':'warn',p.lee?'Escala por la banda de sotavento: le diste abrigo a la lancha.':'Pusiste la escala por barlovento. Debe ir por sotavento para abrigar a la lancha.','Buena práctica');}
+    if(ev.buoyHits.size)add('warn',`Tocaste boya(s): ${[...ev.buoyHits].join(', ')}.`,'Navegación en canal');
+  }
+  if(id==='mob'){
+    const m=M.mob;
+    if(m.t0==null)add('warn','El ejercicio terminó antes de la caída.','—');
+    else{
+      const fr=m.firstRud;
+      if(!fr)add('fail','No metiste timón después de la caída.','Maniobra de Williamson');
+      else add(fr.ang>0&&fr.dt<=15?'ok':fr.ang>0?'warn':'fail',fr.ang>0?`Timón a estribor (lado de la caída) a los ${fr.dt.toFixed(0)} s${fr.dt<=15?'.':'. Debe ser inmediato.'}`:'El primer timón fue a babor: llevaste la popa y la hélice hacia la persona.','Maniobra de Williamson');
+      const chk=(k,label,lim)=>{const t=m[k];add(t!=null&&t<=lim?'ok':t!=null?'warn':'fail',t!=null?`${label} a los ${t.toFixed(0)} s${t<=lim?'.':'. Hazlo de inmediato.'}`:`No ${label.toLowerCase()}.`,'Procedimiento de hombre al agua');};
+      chk('buoyT','Lanzaste el aro salvavidas',20); chk('markT','Marcaste MOB en el GPS',20); chk('alarmT','Diste la alarma',30); chk('capT','Avisaste al Capitán',45);
+      add(m.recip?'ok':'warn',m.recip?'Llegaste al rumbo opuesto y volviste por tu estela.':'No llegaste al rumbo opuesto; la Williamson te deja de regreso por tu estela.','Maniobra de Williamson');
+      if(m.prop)add('fail','La persona quedó a menos de 22 m de la hélice con la máquina en marcha.','Seguridad');
+      add(m.rescued?'ok':'fail',m.rescued?`Persona recuperada a los ${(m.rescued-m.t0).toFixed(0)} s de la caída.`:'No recuperaste a la persona.','Objetivo');
+    }
+  }
+  if(id==='fondeo'){
+    const a=M.anchor;
+    add(a.ready?'ok':'warn',a.ready?'Ordenaste preparar el ancla con anticipación.':'No ordenaste preparar el ancla a proa antes de llegar.','Procedimiento');
+    if(a.drop){
+      add(a.drop.u<=.25&&a.drop.u>=-.6?'ok':a.drop.u<=.6?'warn':'fail',`Arrancada al dejar caer el ancla: ${(a.drop.u/KN).toFixed(1)} kn ${a.drop.u>=0?'avante':'atrás'}${a.drop.u<=.25&&a.drop.u>=-.6?'.':a.drop.u<=.6?'. Algo de arrancada avante; mejor casi parado o un poco atrás.':'. Demasiada arrancada avante: riesgo para el molinete y el ancla puede no agarrar.'}`,'Técnica de fondeo');
+      add(Math.abs(a.drop.dh)<=30?'ok':'warn',`Proa a ${Math.abs(a.drop.dh).toFixed(0)}° de la corriente y el viento${Math.abs(a.drop.dh)<=30?'.':'. Conviene proa al elemento.'}`,'Técnica de fondeo');
+      add(a.drop.d<=100?'ok':a.drop.d<=200?'warn':'fail',`Ancla a ${a.drop.d.toFixed(0)} m del punto asignado.`,'Posicionamiento');
+    } else add('fail','No dejaste caer el ancla.','Objetivo');
+    if(a.shackles)add(a.shackles>=3&&a.shackles<=7?'ok':'warn',`${a.shackles} grilletes (${(a.shackles*27.5).toFixed(0)} m) en 22 m de profundidad${a.shackles>=3&&a.shackles<=7?'.':'. Revisa: de 4 a 6 veces la profundidad con buen tiempo, más con mal tiempo.'}`,'Cadena');
+    add(a.ball?'ok':'warn',a.ball?'Izaste la bola de fondeo.':'Faltó izar la bola de fondeo.','Regla 30');
+    add(M.ev.vhf.fondeado?'ok':'warn',M.ev.vhf.fondeado?'Informaste a Capitanía la posición de fondeo.':'Faltó informar a Capitanía que quedaste fondeado.','Procedimiento');
+  }
+  const fails=C.filter(c=>c.st==='fail').length,warns=C.filter(c=>c.st==='warn').length;
+  M.result={C,verdict:fails?'bad':warns?'warn':'ok'};
+  renderMBrief(); $('m-brief').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ---------- sonidos ----------
+function horn(blasts,freq){try{mAudio=mAudio||new (window.AudioContext||window.webkitAudioContext)();let t=mAudio.currentTime+.02;for(const d of blasts){const o=mAudio.createOscillator(),g=mAudio.createGain();o.type='sawtooth';o.frequency.value=freq||150;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+.03);g.gain.setValueAtTime(.07,t+d-.05);g.gain.linearRampToValueAtTime(0,t+d);o.connect(g).connect(mAudio.destination);o.start(t);o.stop(t+d+.02);t+=d+.3;}}catch(e){}}
+function mAlarm(){horn([.3,.3,.3,.3,.3,.3,1.2],420);}
+
+// ---------- UI ----------
+function renderMChips(){$('m-chips').innerHTML=MSCEN.map((s,i)=>`<button class="chip" data-i="${i}"><small>${String(i+1).padStart(2,'0')}</small>${s.title}</button>`).join('');$('m-chips').onclick=e=>{const b=e.target.closest('.chip');if(b)mload(+b.dataset.i);};}
+function renderMBrief(){
+  const sc=M.sc,b=$('m-brief');
+  if(M.result){const r=M.result,map={ok:['verdict-ok','Aprobado'],warn:['verdict-warn','Aprobado con observaciones'],bad:['verdict-bad','Reprobado: revisa los puntos en rojo']};
+    b.className='panel brief debrief';
+    b.innerHTML=`<div class="label">Evaluación · ${sc.title}</div><h2 class="${map[r.verdict][0]}">${map[r.verdict][1]}</h2><ul class="checks">${r.C.map(c=>`<li class="${c.st}"><span class="ic">${c.st==='ok'?'✓':c.st==='warn'?'!':'✗'}</span><div>${c.txt}<small>${c.rule}</small></div></li>`).join('')}</ul>
+    <div class="row" style="margin-top:14px"><button class="btn primary" id="m-again">Repetir escenario</button>${M.idx<MSCEN.length-1?'<button class="btn" id="m-next">Siguiente escenario</button>':''}</div>`;
+    $('m-again').onclick=()=>mload(M.idx);const n=$('m-next');if(n)n.onclick=()=>mload(M.idx+1);return;}
+  b.className='panel brief';const ans=M.quiz!==null;
+  b.innerHTML=`<div class="label">Maniobra ${String(M.idx+1).padStart(2,'0')}</div><h2>${sc.title}</h2><p>${sc.brief}</p>
+  ${M.started?'<p class="kbd">Ejercicio en curso. Usa la velocidad ×1 o ×2 para las maniobras finas.</p>':`
+  <div class="label" style="margin-top:4px">${sc.q}</div>
+  <div class="quiz">${sc.opts.map((o,i)=>`<button class="qopt ${ans?(i===sc.ok?'right':i===M.quiz?'wrong':''):''}" data-q="${i}" ${ans?'disabled':''}>${o}</button>`).join('')}</div>
+  ${ans?`<div class="explain" style="margin-top:10px">${M.quiz===sc.ok?'<b>Correcto.</b> ':'<b>No es correcto.</b> '}${sc.why}</div>`:''}
+  <div class="row" style="margin-top:12px"><button class="btn primary" id="m-start" ${ans?'':'disabled'}>Iniciar ejercicio</button>${ans?'':'<span class="kbd">Contesta para empezar</span>'}</div>`}`;
+  b.querySelectorAll('.qopt').forEach(q=>q.onclick=()=>{M.quiz=+q.dataset.q;renderMBrief();});
+  const st=$('m-start');if(st)st.onclick=()=>{M.started=true;M.running=true;mlog('Inicio del ejercicio.');renderMBrief();renderExtras();$('m-pause').textContent='Pausa';};
+}
+function renderControls(){
+  $('m-rudbtns').innerHTML=RUDS.map(r=>`<button class="btn ${r<0?'port':r>0?'stbd':''}" data-rud="${r}" aria-pressed="${M.ship.rudOrd===r}">${r===0?'A la vía':(r<0?'Br ':'Er ')+Math.abs(r)+'°'}</button>`).join('');
+  $('m-tele').innerHTML=TELE.map(([n,v])=>`<button class="btn" data-n="${v}" aria-pressed="${M.ship.nOrd===v}">${n}</button>`).join('');
+}
+// quiet: la rueda cambia el timón sin anotar cada grado; anota al soltarla (logRud)
+function logRud(r){mlog(r===0?'Timón a la vía.':`Timón a ${r<0?'babor':'estribor'} ${Math.abs(r)}°.`);}
+function setRud(r,quiet){if(M.ended)return;const s=M.ship;r=clamp(Math.round(r),-35,35);if(s.rudOrd!==r){s.rudOrd=r;if(!quiet)logRud(r);
+  if(M.mob&&M.mob.t0!=null&&!M.mob.firstRud&&r!==0)M.mob.firstRud={ang:r,dt:M.t-M.mob.t0};}renderControls();}
+function setN(v){if(M.ended)return;const s=M.ship;if(s.nOrd!==v){s.nOrd=v;mlog(`Máquina: ${TELE.find(t=>t[1]===v)[0].toLowerCase()}.`);}renderControls();}
+function setBT(v){if(M.ended)return;M.ship.bt=v;if(v)M.ev.usedBT=true;mlog(v?`Hélice de proa a ${v<0?'babor':'estribor'}.`:'Hélice de proa parada.');renderExtras();}
+
+function renderExtras(){
+  const ex=M.sc.extras, s=M.ship, parts=[];
+  const sec=(title,body)=>`<div class="ctl"><div class="label">${title}</div>${body}</div>`;
+  if(ex.includes('bt'))parts.push(sec('Hélice de proa',`<div class="seg"><button class="btn port" data-bt="-1" aria-pressed="${s.bt===-1}">◀ A babor</button><button class="btn" data-bt="0" aria-pressed="${s.bt===0}">Parar</button><button class="btn stbd" data-bt="1" aria-pressed="${s.bt===1}">A estribor ▶</button></div><p class="hint">Pierde efecto arriba de unos 4 nudos.</p>`));
+  if(ex.includes('tug'))parts.push(sec('Remolcador en la aleta de babor',`<div class="seg"><button class="btn port" data-tug="-1" aria-pressed="${s.tug===-1}">Empujar a babor</button><button class="btn" data-tug="0" aria-pressed="${s.tug===0}">Parar</button><button class="btn stbd" data-tug="1" aria-pressed="${s.tug===1}">Tirar a estribor</button></div>`));
+  if(ex.includes('tugs2')){const on=M.ev.vhf.tugs&&!M.ev.vhf.libres,tg=(n,name,val)=>`<div class="label" style="margin-top:6px">${name}</div><div class="seg"><button class="btn port" data-tg="${n}:-1" aria-pressed="${val===-1}" ${on?'':'disabled'}>Tirar a babor</button><button class="btn" data-tg="${n}:0" aria-pressed="${val===0}" ${on?'':'disabled'}>Parar</button><button class="btn stbd" data-tg="${n}:1" aria-pressed="${val===1}" ${on?'':'disabled'}>Empujar a estribor</button></div>`;
+    parts.push(sec('Remolcadores · VHF 71',tg(1,'Remolcador 1 · proa',s.tug1)+tg(2,'Remolcador 2 · popa',s.tug2)+`<p class="hint">${M.ev.vhf.libres?'Remolcadores largados.':on?'Babor es hacia afuera del muelle.':'Confirma primero que están firmes.'}</p>`));}
+  if(ex.includes('vhf-zarpe')){const v=M.ev.vhf;parts.push(sec('VHF',`<div class="seg"><button class="btn" data-vhf="ctl" ${v.ctl?'disabled':''}>Control de Tráfico: solicito salida</button><button class="btn" data-vhf="tugs" ${v.tugs?'disabled':''}>Remolcadores: confirmen firmes</button><button class="btn" data-vhf="libres" ${v.libres||!v.tugs?'disabled':''}>Remolcadores: largar</button></div>`));}
+  if(ex.includes('lines'))parts.push(sec('Cabos',`<div class="lines">${M.lines.map((l,i)=>`<div class="lineitem ${l.on?'':'off'}"><span>${l.name} <span class="ten" id="m-ten-${i}"></span></span>${l.on?`<button class="btn" data-line="${i}">Largar</button>`:`<span class="ten">${l.broken?'faltó':'largado'}</span>`}</div>`).join('')}</div>`));
+  if(ex.includes('finish'))parts.push(sec('Amarre',`<button class="btn primary" id="m-finish" disabled>Pasar cabos y terminar</button><p class="hint" id="m-finhint"></p>`));
+  if(ex.includes('vhf-salida')){const v=M.ev.vhf;parts.push(sec('VHF',`<div class="seg"><button class="btn" data-vhf="salida" ${v.salida?'disabled':''}>Capitanía: solicito salida</button><button class="btn" data-vhf="entrante" ${v.entrante?'disabled':''}>Buque entrante: paso babor con babor</button><button class="btn" data-vhf="practico" ${v.practico?'disabled':''}>Capitanía: práctico desembarcado</button></div>`));}
+  if(ex.includes('pilot'))parts.push(sec('Práctico',M.ev.pilot?`<p class="hint">Práctico desembarcado por ${M.ev.pilot.side}.</p>`:`<div class="seg"><button class="btn port" data-pilot="babor">Escala por babor y desembarcar</button><button class="btn stbd" data-pilot="estribor">Escala por estribor y desembarcar</button></div>`));
+  if(ex.includes('mob')){const m=M.mob;parts.push(sec('Emergencia',`<div class="seg">
+    <button class="btn" data-mob="buoyT" ${m.buoyT!=null?'disabled':''}>Lanzar aro salvavidas</button>
+    <button class="btn" data-mob="markT" ${m.markT!=null?'disabled':''}>Marcar MOB en GPS</button>
+    <button class="btn" data-mob="alarmT" ${m.alarmT!=null?'disabled':''}>Alarma general</button>
+    <button class="btn" data-mob="capT" ${m.capT!=null?'disabled':''}>Avisar al Capitán</button></div>
+    <button class="btn primary" id="m-rescue" disabled style="margin-top:8px">Recuperar persona</button><p class="hint" id="m-finhint"></p>`));}
+  if(ex.includes('anchor')){const a=M.anchor;let body=`<div class="seg"><button class="btn" data-anc="ready" ${a.ready?'disabled':''}>Proa: preparar ancla</button>`;
+    if(!a.drop)body+=`<button class="btn port" data-anc="Br">Fondo ancla de babor</button><button class="btn stbd" data-anc="Er">Fondo ancla de estribor</button>`;
+    body+=`</div>`;
+    if(a.drop&&!a.shackles)body+=`<div class="label" style="margin-top:6px">Arriar cadena (grilletes de 27.5 m)</div><div class="seg">${[2,3,4,5,6,7,9].map(n=>`<button class="btn" data-shk="${n}">${n}</button>`).join('')}</div>`;
+    if(a.shackles)body+=`<p class="hint">${a.shackles} grilletes en el agua.</p>`;
+    body+=`<div class="seg" style="margin-top:6px"><button class="btn" data-anc="ball" ${a.ball?'disabled':''}>Izar bola de fondeo</button><button class="btn" data-vhf="fondeado" ${M.ev.vhf.fondeado?'disabled':''}>Capitanía: fondeado en posición</button></div>
+      <button class="btn primary" id="m-finish" disabled style="margin-top:8px">Terminar fondeo</button><p class="hint" id="m-finhint"></p>`;
+    parts.push(sec('Ancla',body));}
+  $('m-extra').innerHTML=parts.join('');
+  const f=$('m-finish'); if(f)f.onclick=()=>{if(canFinish().ok){mlog(M.berth?'Cabos a tierra. Buque atracado.':'Fondeo terminado.');mend('ok');}};
+  const rs=$('m-rescue'); if(rs)rs.onclick=()=>{if(canFinish().ok){M.mob.rescued=M.t;mlog('Persona recuperada.');mend('ok');}};
+}
+$('m-extra').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||M.ended)return;
+  if(!M.started)return;
+  if(b.dataset.bt!=null){setBT(+b.dataset.bt);}
+  else if(b.dataset.tug!=null){M.ship.tug=+b.dataset.tug;if(M.ship.tug)M.ev.usedTug=true;mlog(M.ship.tug?`Remolcador: ${M.ship.tug<0?'empuja a babor':'tira a estribor'}.`:'Remolcador parado.');renderExtras();}
+  else if(b.dataset.tg){const [n,v]=b.dataset.tg.split(':').map(Number);M.ship['tug'+n]=v;if(v)M.ev.usedTug=true;mlog(`Remolcador ${n}: ${v<0?'tira a babor':v>0?'empuja a estribor':'para'}.`);renderExtras();}
+  else if(b.dataset.line!=null){const l=M.lines[+b.dataset.line];l.on=false;if(!M.ev.order.length){M.ev.authFirst=!!M.ev.vhf.ctl;M.ev.tugsFirst=!!M.ev.vhf.tugs;}M.ev.order.push(l.name);
+    if(l.name==='Spring de proa')M.ev.springAngle=Math.abs(sdiff(M.ship.h,0));mlog(`Largar ${l.name.toLowerCase()}.`);renderExtras();}
+  else if(b.dataset.vhf){const k=b.dataset.vhf;M.ev.vhf[k]=true;M.ev.vhfY[k]=M.ship.y;
+    if(k==='libres'){M.ship.tug1=0;M.ship.tug2=0;}
+    mlog({ctl:'VHF 14 a Control de Tráfico: solicito autorización de salida. Autorizado.',tugs:'VHF 71: Remolcador 1 firme a proa, Remolcador 2 firme a popa.',libres:'VHF 71: largar remolcadores. Remolcadores libres.',salida:'VHF a Capitanía: solicito autorización de salida. Autorizado.',entrante:'VHF al buque entrante: propongo paso babor con babor. Conforme.',practico:'VHF a Capitanía: práctico desembarcado.',fondeado:'VHF a Capitanía: fondeado en el Fondeadero A.'}[k]);renderExtras();}
+  else if(b.dataset.pilot){const s=M.ship,side=b.dataset.pilot,wt=(M.wind.from+180-s.h)*D2R,leeSide=Math.sin(wt)>0?'estribor':'babor';
+    M.ev.pilot={side,lee:side===leeSide,spd:sog()/KN,inZone:Math.hypot(s.x-PILOT.x,s.y-PILOT.y)<=PILOT.r};mlog(`Práctico desembarca por ${side} a ${(sog()/KN).toFixed(1)} kn.`);renderExtras();}
+  else if(b.dataset.mob){const k=b.dataset.mob,m=M.mob;if(m.t0==null){mlog('Todavía no hay emergencia.');return;}m[k]=M.t-m.t0;
+    if(k==='buoyT'){const p=toW(M.ship,-40,12);m.ring={x:p.x,y:p.y};}
+    if(k==='markT'){m.mark={x:M.ship.x,y:M.ship.y};}
+    if(k==='alarmT')mAlarm();
+    mlog({buoyT:'Aro salvavidas al agua.',markT:'MOB marcado en el GPS.',alarmT:'Alarma general: hombre al agua.',capT:'Capitán avisado, sube al puente.'}[k]);renderExtras();}
+  else if(b.dataset.anc){const a=M.anchor,s=M.ship,k=b.dataset.anc;
+    if(k==='ready'){a.ready=true;mlog('Proa: ancla preparada, molinete listo.');}
+    else if(k==='ball'){a.ball=true;mlog('Bola de fondeo izada.');}
+    else{const hx=k==='Br'?-5:5,p=toW(s,55,hx);const l=latSpeeds();
+      a.drop={u:l.lon,dh:sdiff(s.h,180),d:Math.hypot(p.x-ANCH.x,p.y-ANCH.y),side:k};a.pt={x:p.x,y:p.y};
+      a.chain={name:'cadena',sx:55,sy:hx,bx:p.x,by:p.y,L0:30,k:.006,c:.08,max:1,on:true,T:0,dPrev:null};
+      mlog(`Fondo ancla de ${k==='Br'?'babor':'estribor'}.`);if(!a.ready)mlog('Ojo: el ancla no estaba preparada.');}
+    renderExtras();}
+  else if(b.dataset.shk){const n=+b.dataset.shk;M.anchor.shackles=n;M.anchor.chain.L0=n*27.5;mlog(`Arriadas ${n} grilletes en el agua.`);renderExtras();}
+});
+
+function mupdate(){
+  const s=M.ship,l=latSpeeds(),kn=x=>(x/KN);
+  $('m-time').textContent=mclock(); $('m-hdg').textContent=pad3(s.h)+'°';
+  $('m-rot').textContent=(s.r*60>=0?'+':'')+(s.r*60).toFixed(0);
+  $('m-spd').textContent=`${kn(l.lon).toFixed(1)} ${l.lon>=0?'av':'at'}`;
+  const lat=v=>`${Math.abs(kn(v)).toFixed(2)} ${Math.abs(v)<.005?'':v>0?'Er':'Br'}`;
+  $('m-latb').textContent=lat(l.bow); $('m-lats').textContent=lat(l.stern);
+  $('m-rud').textContent=`${s.rud<-.5?'Br':s.rud>.5?'Er':''} ${Math.abs(s.rud).toFixed(0)}°`;
+  $('m-rpm').textContent=`${s.delay>0?'arranque':(s.n*100).toFixed(0)+'%'}`;
+  $('m-rudord').textContent=s.rudOrd===0?'a la vía':`${s.rudOrd<0?'Br':'Er'} ${Math.abs(s.rudOrd)}°`;
+  const ri=$('m-rudind'),pct=s.rud/35*50; ri.style.left=(pct<0?50+pct:50)+'%'; ri.style.width=Math.abs(pct)+'%'; ri.style.background=s.rud<0?'var(--bad)':'var(--ok)';
+  const c=[];
+  if(M.wind.kn)c.push(`Viento <b>${pad3(M.wind.from)}° ${M.wind.kn} kn</b>`);
+  if(M.cur.x||M.cur.y)c.push(`Corriente <b>hacia ${pad3(Math.atan2(M.cur.x,M.cur.y)/D2R)}° ${(Math.hypot(M.cur.x,M.cur.y)/KN).toFixed(1)} kn</b>`);
+  c.push(`SOG <b>${(sog()/KN).toFixed(1)} kn</b>`);
+  if(M.berth||M.sc.id==='desatraque'||M.sc.id==='zarpe'){const e=berthErr();c.push(`Al muelle <b>${Math.max(0,e.gap).toFixed(1)} m</b>`);if(M.berth)c.push(`Al puesto <b>${e.dy>0?'+':''}${e.dy.toFixed(0)} m</b>`);}
+  if(M.sc.id==='zarpe')c.push(`Al eje del canal <b>${Math.abs(s.x).toFixed(0)} m</b>`);
+  if(M.sc.id==='mob'&&M.mob.p){const d=mobDist();c.push(`Persona <b>${d.toFixed(0)} m</b>`);}
+  if(M.sc.id==='fondeo'){const p=toW(s,55,0);c.push(`Al punto <b>${Math.hypot(p.x-ANCH.x,p.y-ANCH.y).toFixed(0)} m</b>`,'Prof. <b>22 m</b>');}
+  if(M.sc.id==='salida'&&M.other&&M.other.on)c.push(`Buque entrante <b>${Math.hypot(s.x-M.other.x,s.y-M.other.y).toFixed(0)} m</b>`);
+  $('m-ctx').innerHTML=c.map(x=>`<span>${x}</span>`).join('');
+  M.lines.forEach((ln,i)=>{const el=$('m-ten-'+i);if(el)el.textContent=ln.on?(ln.T>0?`tensión ${Math.round(ln.T/ln.max*100)}%`:'flojo'):'';});
+  const f=$('m-finish')||$('m-rescue'),h=$('m-finhint');if(f&&!M.ended){const cf=canFinish();f.disabled=!cf.ok||!M.started;if(h)h.textContent=cf.ok?'':cf.why;}
+}
+
+// ---------- dibujo ----------
+function mSize(c){const r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(r.width*dpr)),h=Math.max(1,Math.round(r.height*dpr));if(c.width!==w||c.height!==h){c.width=w;c.height=h;}return {w,h,dpr};}
+function drawPlan(){
+  if(!M)return;const {w,h,dpr}=mSize(plan);if(w<10)return;
+  const ctx=pctx,s=M.ship,mpp=ZOOMS[M.zoom],k=dpr/mpp,cx=w/2,cy=h/2;
+  const P=(x,y)=>[cx+(x-s.x)*k,cy-(y-s.y)*k];
+  const poly=(pts,fill,stroke,lw)=>{ctx.beginPath();pts.forEach((p,i)=>{const [X,Y]=P(p.x??p[0],p.y??p[1]);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=(lw||1)*dpr;ctx.stroke();}};
+  ctx.fillStyle='#0c2636';ctx.fillRect(0,0,w,h);
+  // cuadrícula 100 m
+  const g=100*k; if(g>22){ctx.strokeStyle='rgba(102,201,216,.07)';ctx.lineWidth=1;const x0=Math.floor((s.x-cx/k)/100)*100,y0=Math.floor((s.y-cy/k)/100)*100;
+    for(let x=x0;x<s.x+cx/k+100;x+=100){const [X]=P(x,0);ctx.beginPath();ctx.moveTo(X,0);ctx.lineTo(X,h);ctx.stroke();}
+    for(let y=y0;y<s.y+cy/k+100;y+=100){const [,Y]=P(0,y);ctx.beginPath();ctx.moveTo(0,Y);ctx.lineTo(w,Y);ctx.stroke();}}
+  if(!M.open){
+    SHOALS.forEach(sh=>poly(sh.pts,'#1b4a5d',null));
+    ctx.fillStyle='rgba(215,225,231,.35)';ctx.font=`${11*dpr}px "IBM Plex Mono",monospace`;ctx.textAlign='center';
+    [[-700,-1800],[700,-1800]].forEach(([x,y])=>{const [X,Y]=P(x,y);ctx.fillText('BAJO · 4 m',X,Y);});
+    [[0,-1800],[0,300],[0,-400]].forEach(([x,y])=>{const [X,Y]=P(x,y);ctx.fillText(y>0?'DÁRSENA · 12 m':'CANAL · 13 m',X,Y);});
+    LAND.forEach(l=>poly(l.pts,'#36342a','#4d4a3a'));
+    // muelle con defensas y bitas
+    const [qx,qy0]=P(-500,0),[,qy1]=P(-500,700);ctx.strokeStyle='#c8b98a';ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(qx,qy0);ctx.lineTo(qx,qy1);ctx.stroke();
+    ctx.fillStyle='#e7dcb6';for(let y=20;y<700;y+=30){const [X,Y]=P(-505,y);ctx.beginPath();ctx.arc(X,Y,Math.max(1.5*dpr,1.6*k),0,7);ctx.fill();}
+    ctx.fillStyle='#1d1d1a';for(let y=30;y<700;y+=40){const [X,Y]=P(-499,y);ctx.fillRect(X-1*dpr,Y-Math.max(2,3*k),Math.max(2*dpr,1.5*k),Math.max(4,6*k));}
+    const [lx,ly]=P(-1000,350);ctx.fillStyle='rgba(215,225,231,.5)';ctx.font=`600 ${13*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText('MUELLE OESTE',lx,ly);
+    if(M.berth){ctx.setLineDash([5*dpr,4*dpr]);poly([[-498,300],[-478,300],[-478,420],[-498,420]],null,'#f2a93b',1.5);ctx.setLineDash([]);}
+    poly(hullW(MOORED),'#5c6670','#8a959e');
+    // fondeadero y zona de práctico
+    ctx.setLineDash([6*dpr,6*dpr]);ctx.strokeStyle='rgba(242,169,59,.6)';ctx.lineWidth=1.2*dpr;
+    let [ax,ay]=P(ANCH.x,ANCH.y);ctx.beginPath();ctx.arc(ax,ay,ANCH.r*k,0,7);ctx.stroke();
+    let [px,py]=P(PILOT.x,PILOT.y);ctx.strokeStyle='rgba(102,201,216,.5)';ctx.beginPath();ctx.arc(px,py,PILOT.r*k,0,7);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='rgba(242,169,59,.85)';ctx.font=`600 ${12*dpr}px "Barlow Condensed",sans-serif`;ctx.fillText('FONDEADERO A',ax,ay-ANCH.r*k-6*dpr);
+    ctx.beginPath();ctx.moveTo(ax-6*dpr,ay);ctx.lineTo(ax+6*dpr,ay);ctx.moveTo(ax,ay-6*dpr);ctx.lineTo(ax,ay+6*dpr);ctx.strokeStyle='#f2a93b';ctx.stroke();
+    ctx.fillStyle='rgba(102,201,216,.85)';ctx.fillText('ZONA DE PRÁCTICO',px,py-PILOT.r*k-6*dpr);
+    // boyas
+    BUOYS.forEach(b=>{const [X,Y]=P(b.x,b.y),r=Math.max(4*dpr,3*k);
+      if(b.c==='red'){ctx.fillStyle='#e25a4f';ctx.fillRect(X-r,Y-r,2*r,2*r);}
+      else if(b.c==='green'){ctx.fillStyle='#3fbf6e';ctx.beginPath();ctx.moveTo(X,Y-r*1.3);ctx.lineTo(X+r,Y+r);ctx.lineTo(X-r,Y+r);ctx.closePath();ctx.fill();}
+      else{ctx.fillStyle='#e25a4f';ctx.beginPath();ctx.arc(X,Y,r,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(X-r*.3,Y-r,r*.6,2*r);}
+      ctx.fillStyle='rgba(215,225,231,.8)';ctx.font=`${10*dpr}px "IBM Plex Mono",monospace`;ctx.textAlign='left';ctx.fillText(String(b.n),X+r+3*dpr,Y+3*dpr);});
+    if(M.other&&M.other.on){poly(hullW(M.other),'#8b8f96','#b9bec4');}
+  } else {
+    ctx.fillStyle='rgba(215,225,231,.3)';ctx.font=`${11*dpr}px "IBM Plex Mono",monospace`;ctx.textAlign='left';ctx.fillText('MAR ABIERTO · prof. > 200 m',10*dpr,h-30*dpr);
+  }
+  // ancla y cadena
+  if(M.anchor&&M.anchor.pt){const [X,Y]=P(M.anchor.pt.x,M.anchor.pt.y),hp=toW(s,M.anchor.chain.sx,M.anchor.chain.sy),[HX,HY]=P(hp.x,hp.y);
+    ctx.strokeStyle='#b9c2c9';ctx.setLineDash([3*dpr,3*dpr]);ctx.lineWidth=1.5*dpr;ctx.beginPath();ctx.moveTo(HX,HY);ctx.lineTo(X,Y);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#b9c2c9';ctx.font=`${14*dpr}px sans-serif`;ctx.textAlign='center';ctx.fillText('⚓',X,Y+5*dpr);}
+  // cabos
+  M.lines.forEach(l=>{if(!l.on)return;const p=toW(s,l.sx,l.sy),[X1,Y1]=P(p.x,p.y),[X2,Y2]=P(l.bx,l.by),f=l.T/l.max;
+    ctx.strokeStyle=f>.75?'#ff5f57':f>.4?'#f2a93b':'#f2d24b';ctx.lineWidth=Math.max(1.2*dpr,.6*k);ctx.beginPath();ctx.moveTo(X1,Y1);ctx.lineTo(X2,Y2);ctx.stroke();});
+  // persona, aro, marca MOB
+  if(M.mob&&M.mob.p){const [X,Y]=P(M.mob.p.x,M.mob.p.y);ctx.fillStyle='#ff8a2a';ctx.beginPath();ctx.arc(X,Y,4.5*dpr,0,7);ctx.fill();ctx.strokeStyle='rgba(255,138,42,.5)';ctx.beginPath();ctx.arc(X,Y,10*dpr+4*dpr*Math.sin(Date.now()/250),0,7);ctx.stroke();
+    if(M.mob.ring){const [RX,RY]=P(M.mob.ring.x,M.mob.ring.y);ctx.strokeStyle='#ff5f57';ctx.lineWidth=2.5*dpr;ctx.beginPath();ctx.arc(RX,RY,4*dpr,0,7);ctx.stroke();}
+    if(M.mob.mark){const [MX,MY]=P(M.mob.mark.x,M.mob.mark.y);ctx.strokeStyle='#f2a93b';ctx.lineWidth=1.5*dpr;ctx.beginPath();ctx.moveTo(MX-6*dpr,MY-6*dpr);ctx.lineTo(MX+6*dpr,MY+6*dpr);ctx.moveTo(MX+6*dpr,MY-6*dpr);ctx.lineTo(MX-6*dpr,MY+6*dpr);ctx.stroke();ctx.fillStyle='#f2a93b';ctx.font=`${10*dpr}px "IBM Plex Mono",monospace`;ctx.textAlign='left';ctx.fillText('MOB',MX+8*dpr,MY-6*dpr);}}
+  // buque propio: línea de proa y vector de 60 s
+  const hp=toW(s,600,0),[hx,hy]=P(hp.x,hp.y),[sx,sy]=P(s.x,s.y);ctx.strokeStyle='rgba(215,225,231,.25)';ctx.lineWidth=1*dpr;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(hx,hy);ctx.stroke();
+  const V=shipVel(s);ctx.strokeStyle='#66c9d8';ctx.lineWidth=1.5*dpr;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+(V.x+M.cur.x)*60*k,sy-(V.y+M.cur.y)*60*k);ctx.stroke();
+  poly(hullW(s),'rgba(102,201,216,.28)','#66c9d8',1.5);
+  poly(hullW(s,[[-35,8],[-52,8],[-52,-8],[-35,-8]]),'rgba(102,201,216,.55)',null);
+  // timón e impulsores
+  const rp=toW(s,-60,0),rt=toW(s,-60-10*Math.cos(s.rud*D2R),-10*Math.sin(s.rud*D2R)),[r1x,r1y]=P(rp.x,rp.y),[r2x,r2y]=P(rt.x,rt.y);
+  ctx.strokeStyle=s.rud<-.5?'#ff5f57':s.rud>.5?'#52d183':'#d7e1e7';ctx.lineWidth=Math.max(2*dpr,1.5*k);ctx.beginPath();ctx.moveTo(r1x,r1y);ctx.lineTo(r2x,r2y);ctx.stroke();
+  const arrow=(bx,by,ex,ey,col)=>{const [X1,Y1]=P(bx,by),[X2,Y2]=P(ex,ey),a=Math.atan2(Y2-Y1,X2-X1);ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(X1,Y1);ctx.lineTo(X2,Y2);ctx.stroke();ctx.beginPath();ctx.moveTo(X2,Y2);ctx.lineTo(X2-8*dpr*Math.cos(a-.4),Y2-8*dpr*Math.sin(a-.4));ctx.lineTo(X2-8*dpr*Math.cos(a+.4),Y2-8*dpr*Math.sin(a+.4));ctx.closePath();ctx.fill();};
+  if(s.bt){const a=toW(s,50,0),b=toW(s,50,s.bt*35);arrow(a.x,a.y,b.x,b.y,'#f2a93b');}
+  if(M.tug){const tp=toW(s,-45,-24);ctx.save();const [TX,TY]=P(tp.x,tp.y);ctx.translate(TX,TY);ctx.rotate((s.h+90)*D2R);ctx.fillStyle='#c98a3a';const tl=Math.max(10*dpr,14*k),tw=Math.max(5*dpr,5*k);ctx.fillRect(-tl/2,-tw/2,tl,tw);ctx.restore();
+    if(s.tug){const a=toW(s,-45,-12),b=toW(s,-45,-12+s.tug*35);arrow(a.x,a.y,b.x,b.y,'#c98a3a');}}
+  if(M.tugs&&!M.ev.vhf.libres){[[45,s.tug1],[-45,s.tug2]].forEach(([x,f])=>{const tp=toW(s,x,-24);ctx.save();const [TX,TY]=P(tp.x,tp.y);ctx.translate(TX,TY);ctx.rotate((s.h+90)*D2R);ctx.fillStyle='#c98a3a';const tl=Math.max(10*dpr,14*k),tw=Math.max(5*dpr,5*k);ctx.fillRect(-tl/2,-tw/2,tl,tw);ctx.restore();
+    if(f){const a=toW(s,x,-12),b=toW(s,x,-12+f*35);arrow(a.x,a.y,b.x,b.y,'#c98a3a');}});}
+  // indicadores: viento, corriente, escala
+  ctx.textAlign='left';ctx.font=`${11*dpr}px "IBM Plex Mono",monospace`;
+  const hud=(x,y,toDeg,label,col)=>{ctx.fillStyle='rgba(9,18,26,.7)';ctx.fillRect(x-4*dpr,y-26*dpr,130*dpr,52*dpr);const a=toDeg*D2R,L=16*dpr,ax=x+22*dpr,ay=y;ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2*dpr;
+    ctx.beginPath();ctx.moveTo(ax-Math.sin(a)*L,ay+Math.cos(a)*L);ctx.lineTo(ax+Math.sin(a)*L,ay-Math.cos(a)*L);ctx.stroke();ctx.beginPath();const tx=ax+Math.sin(a)*L,ty=ay-Math.cos(a)*L;ctx.moveTo(tx,ty);ctx.lineTo(tx-7*dpr*Math.sin(a-.45),ty+7*dpr*Math.cos(a-.45));ctx.lineTo(tx-7*dpr*Math.sin(a+.45),ty+7*dpr*Math.cos(a+.45));ctx.closePath();ctx.fill();
+    ctx.fillStyle='#d7e1e7';ctx.fillText(label,x+44*dpr,y+4*dpr);};
+  let hy0=34*dpr;
+  if(M.wind.kn){hud(10*dpr,hy0,M.wind.from+180,`Viento ${M.wind.kn} kn`,'#d7e1e7');hy0+=58*dpr;}
+  if(M.cur.x||M.cur.y)hud(10*dpr,hy0,Math.atan2(M.cur.x,M.cur.y)/D2R,`Corr. ${(Math.hypot(M.cur.x,M.cur.y)/KN).toFixed(1)} kn`,'#66c9d8');
+  const target=110*dpr/k,opts=[20,50,100,200,500,1000],len=opts.reduce((a,b)=>Math.abs(b-target)<Math.abs(a-target)?b:a);
+  ctx.fillStyle='#d7e1e7';ctx.fillRect(12*dpr,h-14*dpr,len*k,3*dpr);ctx.fillText(`${len} m`,12*dpr,h-20*dpr);
+  ctx.textAlign='right';ctx.fillText('N ↑',w-12*dpr,20*dpr);
+  if(M.ended){ctx.fillStyle='rgba(9,18,26,.5)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#d7e1e7';ctx.font=`700 ${22*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText('EJERCICIO TERMINADO',cx,cy+60*dpr);}
+  else if(!M.running){ctx.fillStyle='rgba(215,225,231,.85)';ctx.font=`600 ${14*dpr}px "Barlow Condensed",sans-serif`;ctx.textAlign='center';ctx.fillText(M.started?'EN PAUSA':'CONTESTA LA PREGUNTA E INICIA',cx,h-40*dpr);}
+}
+
+let uiT=0;
+function mloop(ts){
+  const dtR=mlast?Math.min(.1,(ts-mlast)/1000):0;mlast=ts;
+  if(window.__mode==='man'&&M){
+    if(M.running&&!M.ended){let rem=dtR*macc;while(rem>0&&!M.ended){const d=Math.min(.05,rem);mstep(d);rem-=d;}}
+    uiT+=dtR;if(uiT>.15){uiT=0;mupdate();}
+    drawPlan();
+  }
+  requestAnimationFrame(mloop);
+}
+
+// ---------- eventos ----------
+$('m-accel').innerHTML=[1,2,4,8].map(v=>`<button class="btn" data-acc="${v}" aria-pressed="${v===macc}">×${v}</button>`).join('');
+$('m-accel').onclick=e=>{const b=e.target.closest('[data-acc]');if(!b)return;macc=+b.dataset.acc;$('m-accel').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));};
+$('m-rudbtns').onclick=e=>{const b=e.target.closest('[data-rud]');if(b)setRud(+b.dataset.rud);};
+$('m-tele').onclick=e=>{const b=e.target.closest('[data-n]');if(b)setN(+b.dataset.n);};
+$('m-zin').onclick=()=>{M.zoom=Math.max(0,M.zoom-1);};
+$('m-zout').onclick=()=>{M.zoom=Math.min(ZOOMS.length-1,M.zoom+1);};
+$('m-pause').onclick=()=>{if(!M.started||M.ended)return;M.running=!M.running;$('m-pause').textContent=M.running?'Pausa':'Continuar';};
+$('m-reset').onclick=()=>{$('m-banner').hidden=true;mload(M.idx);};
+document.addEventListener('keydown',e=>{
+  if(window.__mode!=='man'||e.target.tagName==='INPUT'||!M)return;
+  const s=M.ship;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const left=e.key==='ArrowLeft',nx=left?[...RUDS].reverse().find(r=>r<s.rudOrd):RUDS.find(r=>r>s.rudOrd);if(nx!=null)setRud(nx);}
+  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();const i=TELE.findIndex(t=>t[1]===s.nOrd),j=clamp(i+(e.key==='ArrowUp'?-1:1),0,TELE.length-1);setN(TELE[j][1]);}
+  else if(e.key==='q'||e.key==='Q')setBT(-1); else if(e.key==='e'||e.key==='E')setBT(1); else if(e.key==='w'||e.key==='W')setBT(0);
+  else if(e.key===' '){e.preventDefault();$('m-pause').click();}
+});
+
+// pestañas
+window.__mode='colreg';
+function setMode(m){window.__mode=m;for(const k of ['colreg','man','exam']){$('mode-'+k).hidden=m!==k;$('tab-'+k).setAttribute('aria-selected',m===k);}mlast=0;if(m==='man')requestAnimationFrame(()=>{drawPlan();mupdate();});}
+$('tab-colreg').onclick=()=>setMode('colreg');$('tab-man').onclick=()=>setMode('man');$('tab-exam').onclick=()=>setMode('exam');
+if(location.hash==='#maniobra')setMode('man');
+if(location.hash==='#examen')setMode('exam');
+
+// rueda de timón (la dibuja el último <script>): 1° de timón = 4° de rueda
+window.__manWheel={min:-35,max:35,ratio:4,ok:()=>!!M&&!M.ended,get:()=>M?M.ship.rudOrd:0,set:r=>setRud(r,true),done:(a,b)=>{if(a!==b&&!M.ended)logRud(b);}};
+
+renderMChips(); mload(0); requestAnimationFrame(mloop);
+})();
+</script>
+<script>
+(()=>{
+// ======================= MODO EXAMEN =======================
+// Recorrido guiado del zarpe según la hoja de evaluación: 3 tareas críticas + 28 criterios generales.
+// Sin física: cada paso es una decisión, una orden que ejecutar, una lectura o una alerta.
+const $=id=>document.getElementById(id);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const val=v=>typeof v==='function'?v():v;
+const hm=m=>String(Math.floor(m/60)%24).padStart(2,'0')+String(Math.floor(m%60)).padStart(2,'0');
+const dec=n=>n.toFixed(1).replace('.',' decimal ');
+const pad3=n=>String(n).padStart(3,'0');
+const SHIP='SIERRA MADRE';
+
+const SECS={0:'Tareas críticas de seguridad',1:'Comunicaciones internas y preparativos',2:'Comunicaciones externas',3:'Maniobra de desatraque',4:'Navegación en canal angosto',5:'Canal principal con tráfico denso',6:'Navegación en convoy',7:'Fallas técnicas críticas',8:'Zafarrancho y desembarque del práctico'};
+const ITEMS={
+ C1:'Repite en voz alta y ejecuta exactamente las órdenes de timón y máquina, sin invertir bandas.',
+ C2:'Mantiene la vigilancia visual y de radar sin distraerse en tareas ajenas a la guardia (Regla 5).',
+ C3:'Alerta de inmediato al Capitán ante un blanco en rumbo de colisión o una falla técnica.',
+ '1.1':'Asiste al briefing, anota su rol y confirma las frecuencias de trabajo.',
+ '1.2':'Completa la lista de verificación de salida verificando físicamente los equipos.',
+ '1.3':'Prueba timón, telégrafo y thrusters e informa al Capitán.',
+ '1.4':'Establece comunicación por VHF con proa y popa y confirma personal listo.',
+ '2.1':'Solicita al VTS autorización de salida con terminología SMCP.',
+ '2.2':'Transmite al VTS de forma exacta calados, destino y condiciones operativas.',
+ '2.3':'Enlaza por VHF con los remolcadores en el canal de trabajo correcto.',
+ '2.4':'Usa los mensajes normalizados para confirmar que la asistencia está firme.',
+ '3.1':'Informa en voz alta y de forma continua las distancias al muelle y obstáculos.',
+ '3.2':'Monitorea el abatimiento por viento o corriente y lo reporta de inmediato.',
+ '3.3':'Acusa recibo (read-back) de cada orden antes de aplicarla.',
+ '3.4':'Monitorea el indicador de ángulo de timón y el repetidor para confirmar el giro.',
+ '4.1':'Gobierna con precisión manteniendo el rumbo o las marcas de enfilación.',
+ '4.2':'Lee la ecosonda y reporta el margen bajo la quilla (UKC).',
+ '4.3':'Compara velocidad en el agua (STW) y sobre el fondo (SOG) y reporta variaciones.',
+ '4.4':'Identifica boyas, balizas y marcas del canal e informa su avistamiento.',
+ '5.1':'Usa el radar/ARPA para adquirir blancos en sectores ciegos o de aproximación.',
+ '5.2':'Reporta al Capitán demora, distancia, CPA y TCPA de los buques prioritarios.',
+ '5.3':'Identifica luces, marcas diurnas y señales acústicas.',
+ '5.4':'Mantiene escucha en el canal de seguridad VHF (16/14) y anota los reportes.',
+ '6.1':'Ajusta las revoluciones con rapidez a la velocidad fijada para el convoy.',
+ '6.2':'Mide continuamente la distancia al buque precedente con el VRM.',
+ '6.3':'Alerta de inmediato si la distancia baja del límite seguro.',
+ '6.4':'Registra en la bitácora rumbos, velocidades y horas de reporte del grupo.',
+ '7.1':'Da la alarma verbal inmediata ante un blackout o pérdida de respuesta del timón.',
+ '7.2':'Ejecuta la orden de cambiar el gobierno de automático a manual o de respaldo.',
+ '7.3':'Exhibe las luces o marcas de buque sin gobierno o sintoniza los canales de socorro.',
+ '7.4':'Mantiene disciplina de radio y silencio en el puente.'
+};
+const CRIT=['C1','C2','C3'], GEN=Object.keys(ITEMS).filter(k=>!CRIT.includes(k));
+const CON={bit:'Llenado de diario de navegación',man:'Maniobra de puerto',ayu:'Interpretación de las ayudas a la navegación',reg:'Reglamentos y códigos internacionales',eme:'Respuesta ante emergencias'};
+
+const XRUD=[[-35,'Todo a babor'],[-20,'Babor 20'],[-10,'Babor 10'],[-5,'Babor 5'],[0,'A la vía'],[5,'Estribor 5'],[10,'Estribor 10'],[20,'Estribor 20'],[35,'Todo a estribor']];
+const XENG=[['FA','Toda avante'],['HA','Media avante'],['SA','Poca avante'],['DA','Muy poca avante'],['ST','Parar'],['DS','Muy poca atrás'],['SS','Poca atrás'],['HS','Media atrás'],['FS','Toda atrás']];
+// Órdenes con su frase normalizada en inglés (SMCP) y la versión con la banda o el sentido invertido
+const ORD_RUD=[
+ {t:'rud',v:-20,es:'Timón a babor veinte',en:'Port twenty',inv:'Timón a estribor veinte'},
+ {t:'rud',v:20,es:'Timón a estribor veinte',en:'Starboard twenty',inv:'Timón a babor veinte'},
+ {t:'rud',v:-10,es:'Timón a babor diez',en:'Port ten',inv:'Timón a estribor diez'},
+ {t:'rud',v:10,es:'Timón a estribor diez',en:'Starboard ten',inv:'Timón a babor diez'},
+ {t:'rud',v:-35,es:'Todo a babor',en:'Hard-a-port',inv:'Todo a estribor'},
+ {t:'rud',v:35,es:'Todo a estribor',en:'Hard-a-starboard',inv:'Todo a babor'}];
+const ORD_ENG=[
+ {t:'eng',v:'DA',es:'Muy poca avante',en:'Dead slow ahead',inv:'Muy poca atrás'},
+ {t:'eng',v:'DS',es:'Muy poca atrás',en:'Dead slow astern',inv:'Muy poca avante'},
+ {t:'eng',v:'SA',es:'Poca avante',en:'Slow ahead',inv:'Poca atrás'},
+ {t:'eng',v:'SS',es:'Poca atrás',en:'Slow astern',inv:'Poca avante'},
+ {t:'eng',v:'HS',es:'Media atrás',en:'Half astern',inv:'Media avante'}];
+const ORD_END=[
+ {t:'rud',v:0,es:'Timón a la vía',en:'Midships',inv:'Firme así'},
+ {t:'eng',v:'ST',es:'Parar máquina',en:'Stop engine',inv:'Muy poca avante'}];
+const MARKS=[
+ {q:'De día ves un buque con tres marcas en vertical: bola, bicono y bola. ¿Qué es?',a:['Buque con capacidad de maniobra restringida. Lo informo al Capitán: nos mantenemos apartados.','Buque sin gobierno. Lo informo al Capitán: nos mantenemos bien apartados y con toda la amplitud posible.','Buque restringido por su calado. Lo informo al Capitán: no le estorbamos el paso.'],why:'Regla 27(b): bola, bicono, bola (de noche roja, blanca, roja todo horizonte) es capacidad de maniobra restringida. Regla 18: el buque de propulsión mecánica se mantiene apartado.'},
+ {q:'De día ves un buque con dos bolas negras en vertical. ¿Qué es?',a:['Buque sin gobierno. Lo informo al Capitán: nos mantenemos apartados.','Buque fondeado. Lo informo al Capitán y le damos resguardo al pasar.','Buque con capacidad de maniobra restringida. Lo informo al Capitán.'],why:'Regla 27(a): dos bolas en vertical (de noche dos rojas todo horizonte) es buque sin gobierno. Una sola bola a proa es buque fondeado (Regla 30).'},
+ {q:'De día ves un buque grande con un cilindro negro izado. ¿Qué es?',a:['Buque restringido por su calado: no le estorbamos el paso. Lo informo al Capitán.','Buque fondeado de más de 50 m: le damos resguardo. Lo informo al Capitán.','Pesquero arrastrando: nos mantenemos apartados. Lo informo al Capitán.'],why:'Regla 28: un cilindro (de noche tres rojas todo horizonte en vertical) es buque restringido por su calado. Regla 18(d): se evita estorbar su tránsito seguro.'},
+ {q:'Con la visibilidad cerrándose oyes, cada dos minutos, una pitada larga seguida de dos cortas. ¿Qué puede ser?',a:['Uno sin gobierno, con maniobra restringida, restringido por su calado, de vela, pescando o remolcando. Lo informo con su demora aproximada.','Un buque de propulsión mecánica con arrancada, que es el caso más común. Lo informo al Capitán con su demora aproximada.','Un buque fondeado de más de 100 m, que avisa de su posición. Lo informo al Capitán con su demora aproximada.'],why:'Regla 35(c): una larga y dos cortas es la señal de niebla de esos buques. El de propulsión mecánica con arrancada da una larga (35(a)); parado y sin arrancada, dos largas (35(b)).'},
+ {q:'Un buque a la vista te da cinco pitadas cortas y rápidas. ¿Qué significa?',a:['Duda de nuestras intenciones o de que estemos maniobrando lo suficiente. Lo informo de inmediato al Capitán.','Que va a caer a babor y nos pide que hagamos lo mismo para pasar estribor con estribor. Lo informo de inmediato al Capitán.','Que está dando atrás y nos pide pasar bien claros por su popa. Lo informo de inmediato al Capitán.'],why:'Regla 34(d): al menos cinco pitadas cortas y rápidas indican duda. Una corta: caigo a estribor; dos: caigo a babor; tres: estoy dando atrás (Regla 34(a)).'}];
+
+let X={on:false};
+
+function newData(){
+  const c=pick([[7.8,8.2],[6.9,7.4],[8.0,8.5]]), second=pick(ORD_RUD);
+  return {fwd:c[0],aft:c[1],dest:pick(['Manzanillo','Lázaro Cárdenas','Ensenada']),chart:pick([9.6,10.2,10.8]),
+    tg:{brg:pick([35,48,322]),rng:pick([2.4,2.8,3.2]),cpa:pick([.3,.4]),tcpa:pick([9,11,12])},
+    ord:[pick(ORD_ENG),second,pick(ORD_END)],mark:pick(MARKS),blackout:Math.random()<.5};
+}
+function renderData(){
+  const D=X.D;
+  $('x-data').innerHTML=[['Buque',`B/M ${SHIP} (ficticio) · 120 m · 22 tripulantes`],['Calados',`proa ${D.fwd.toFixed(1)} m · popa ${D.aft.toFixed(1)} m`],['Destino',D.dest],
+    ['Atraque','Banda de Er al muelle Richmond, tramo 48-3, cabos sencillos'],['Viento','N 19 kn, rachas de 22 kn del 020°'],['Corriente','252° · 0.4 kn'],
+    ['Visibilidad','Menor a 5 mn · nublado 7/8'],['Atmósfera','7 °C · HR 87 % · rocío 5.5 °C · 1014 mb'],['Marea','1.0 m'],
+    ['Práctico','Embarca estando atracados · desembarque a 3 kn máximo'],['Remolcadores','1 en proa y 2 en popa · VHF 71, igual que proa y popa'],['Escucha','VHF 16 / 14'],
+    ['Límites','Canal interior 5 kn · canal principal 10 kn']].map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
+}
+
+function build(){
+  const D=X.D, o=D.ord, S=[], ukc=D.chart+1-D.aft, t=D.tg, side=o[1].v<0?'babor':'estribor', ang=Math.abs(o[1].v);
+  const add=(sec,it,con,tt,who,say,q,a,why,log,more)=>S.push({sec,it,con,t:tt,who,say,q,a,why,log,...more});
+  add(1,null,'bit','Asiento de apertura de la guardia','Capitán','Son las 0800. Abra la guardia y asiente las condiciones.','¿Cuál asiento de apertura está completo?',
+    ['0800 Se abre la guardia atracados Er al muelle Richmond tr. 48-3, cabos sencillos. Viento N 19 kn, rachas 22 kn del 020°. Vis. menor a 5 mn, nublado 7/8. 7 °C, HR 87 %, rocío 5.5 °C, 1014 mb. Marea 1.0 m, corriente 252° 0.4 kn.','0800 Se abre la guardia atracados Er al muelle Richmond tr. 48-3. Tiempo nublado, frío y con viento fresco del norte, visibilidad regular. Marea y corriente normales para la hora. Máquina lista, tripulación completa a bordo, sin novedad.','Se abre la guardia en el muelle Richmond, cabos sencillos. Viento N 19 kn, rachas 22 kn del 020°. Vis. menor a 5 mn, nublado 7/8. 7 °C, HR 87 %, rocío 5.5 °C, 1014 mb. Marea 1.0 m, corriente 252° 0.4 kn. Sin novedad en la guardia.'],
+    'Un asiento lleva hora, lugar, situación del buque y los datos completos. Sin la hora y el tramo, o con adjetivos («fresco», «regular») en lugar de las cifras, no sirve. La hoja te da todas las condiciones justamente para que las anotes. El llenado del diario vale 20 % de la calificación.',
+    'Se abre la guardia atracados Er al muelle Richmond tr. 48-3, cabos sencillos. Viento N 19 kn (rachas 22 kn del 020°), vis. menor a 5 mn, 7/8, 7 °C, 1014 mb, marea 1.0 m, corriente 252° 0.4 kn.');
+  add(1,['1.1'],'man','Briefing de maniobra','Capitán','Zarpamos en cuanto embarque el práctico. Usted lleva telégrafo, bitácora y comunicaciones. Remolcadores, proa y popa por canal 71.','Termina el briefing. ¿Qué haces?',
+    ['Anoto mi rol y lo repito: «Telégrafo, bitácora y comunicaciones; trabajo en canal 71, escucha en 16 y 14».','Contesto «enterado, Capitán», subo al puente y ahí reviso en la hoja del ejercicio qué canal le toca a cada estación.','Anoto mi rol y, para no interrumpir, después le confirmo las frecuencias de trabajo al segundo oficial.'],
+    'Criterio 1.1: anotar el rol asignado y confirmar las frecuencias de trabajo. Repetirlo en voz alta deja constancia en la grabación de que lo entendiste.',
+    'Briefing de maniobra. Rol: telégrafo, bitácora y comunicaciones. VHF de trabajo 71, escucha 16/14.');
+  add(1,['1.2'],'man','Lista de preparación del puente','Capitán','Llene la verificación de la preparación del puente antes de navegar.','¿Cómo llenas la lista?',
+    ['Voy punto por punto: pruebo o veo funcionando cada equipo y hasta entonces lo marco. Lo que falle lo informo al Capitán y lo anoto.','Marco de corrido lo que la guardia anterior dejó probado y anotado en bitácora, y pruebo yo solo lo que no aparece ahí. Lo informo al Capitán.','Pruebo los equipos principales (radar, girocompás y VHF), marco la lista completa y lo demás lo verifico ya navegando.'],
+    'Criterio 1.2: «verificando físicamente». El formato pide: plan de viaje firmado, cartas corregidas, pronóstico y mareas; anclas, SIA, ecosonda, GPS, girocompás y repetidores, compás magnético, escala de práctico, radares y ECDIS, corredera; telégrafo, indicador de revoluciones, generadores, paros de emergencia, luces de navegación, silbato, lámpara Aldis, propulsores, comunicaciones con máquinas y cubierta, radios portátiles y VHF con el puerto; relojes sincronizados, aberturas cerradas, búsqueda de polizones y escala del práctico lista. Lo firman el segundo oficial y el Capitán.',
+    'Verificación de la preparación del puente completada. Equipo probado, sin novedad.');
+  add(1,null,'ayu','Riesgo de niebla','Capitán','¿Qué me dice del tiempo?','Tienes 7 °C de temperatura, punto de rocío de 5.5 °C, humedad de 87 % y visibilidad menor a 5 millas. ¿Qué informas?',
+    ['Hay solo 1.5 °C entre temperatura y punto de rocío: puede cerrarse en niebla. Dejo radar, luces de navegación y silbato probados y listos.','Con 87 % de humedad todavía falta mucho para que se sature el aire: la visibilidad de 5 millas se va a mantener durante toda la salida por el canal.','La presión de 1014 mb y el cielo 7/8 indican que entra un temporal: recomiendo reforzar amarras y posponer el zarpe.'],
+    'Cuando la temperatura se acerca al punto de rocío el aire se satura y se forma niebla; lo que cuenta es esa diferencia, no el porcentaje de humedad. Si la visibilidad se reduce aplican las Reglas 6, 19 y 35: velocidad de seguridad, máquina lista y señales de niebla. 1014 mb es una presión normal.');
+  add(1,['1.3'],'man','Pruebas de timón, telégrafo y hélice de proa','Capitán','Pruebe gobierno y máquina.','¿Cómo lo haces y qué informas?',
+    ['Con las bombas del servomotor en marcha meto el timón a toda banda a babor y a estribor y verifico el axiómetro; pruebo telégrafo con máquinas y hélice de proa a las dos bandas. «Timón, telégrafo y hélice de proa probados, sin novedad».','Con las bombas del servomotor en marcha meto el timón 10° a cada banda, veo que el axiómetro responde y doy por probados también el telégrafo y la hélice de proa, que se usaron ayer. «Gobierno y máquina probados, sin novedad».','Llamo a máquinas por el teléfono interior, pregunto si el servomotor, el telégrafo y la hélice de proa están listos y, con su respuesta, informo al Capitán: «Máquinas reporta gobierno y propulsión listos, sin novedad».'],
+    'Criterio 1.3: probar e informar los resultados. SOLAS V/26 exige probar el aparato de gobierno dentro de las 12 horas previas a la salida. La hoja del examen también recuerda prender las bombas del timón.',
+    'Bombas del servomotor en marcha. Probados timón a ambas bandas, telégrafo y hélice de proa. Sin novedad.');
+  add(1,['1.4'],'man','Comunicación con proa y popa','Capitán','Verifique las estaciones de maniobra.','¿Cómo lo haces?',
+    ['Por canal 71: «Proa, aquí puente, ¿cómo me copia?». Espero respuesta, repito con popa y pido a cada una que confirme personal listo.','Por canal 16: «Proa y popa, aquí puente, ¿cómo me copian?». Con que conteste una de las dos doy la comunicación por probada y lo informo.','Por canal 71 aviso una vez: «Proa y popa, puente listo para la maniobra», y sigo con la lista sin esperar respuesta.'],
+    'Criterio 1.4: comunicación clara con las dos estaciones y confirmación de que el personal está listo. La hoja fija el canal 71 para cubierta y remolcadores.',
+    'Comunicación probada con proa y popa por VHF 71. Personal listo en estaciones de maniobra.');
+  add(1,null,'reg','Plática y rondín de protección','Segundo oficial','Terminó la plática de búsqueda de polizones y el rondín, sin novedad.','¿Qué te toca dejar por escrito?',
+    ['Lleno el reporte de simulacros (buque, fecha, hora, lugar, tema, desarrollo, participantes con firma) y asiento en bitácora la hora de la plática y el rondín de protección con su resultado.','Nada por escrito: la plática la dio el segundo oficial, así que a él le toca llenar el reporte y asentarlo en la bitácora; yo solo confirmo de palabra al Capitán que no hubo novedad.','Asiento en bitácora «plática de protección, sin novedad» y dejo el reporte de simulacros para llenarlo después del zarpe, cuando haya tiempo de juntar las firmas de los participantes.'],
+    'La hoja lo pide con todas sus letras: «no olvide asentar que hizo rondines de protección (busca de polizones)» y «llenar formatos». La búsqueda también aparece en la lista de preparación del puente.',
+    'Plática de protección sobre búsqueda de polizones a cargo del segundo oficial. Rondín de protección efectuado, sin novedad. Formato llenado.');
+  add(1,null,'man','Embarque del práctico','Proa','Puente, práctico subiendo por la escala.','El práctico llega al puente. ¿Qué haces?',
+    ['Le entrego la Pilot Card, le informo calados, máquina, hélice y particularidades del buque, y asiento la hora de embarque.','Lo saludo, le ofrezco café y espero a que él pida los datos del buque que necesite; la hora la anoto al terminar la maniobra.','Le cedo la bitácora para que él mismo anote su hora de llegada y firme, y le doy los calados si los pregunta.'],
+    'El intercambio Capitán-práctico empieza con la Pilot Card. La hoja exige anotar tres horas: embarque, confirmación de que no tiene duda de la Pilot Card y primera orden.',
+    'Práctico a bordo. Se le entrega la Pilot Card.',{on:()=>{X.pt.emb=X.min;}});
+  add(1,null,'reg','Banderas del Código Internacional','Práctico','Pilot Card revisada. Conforme, no tengo dudas.','El práctico ya está a bordo y el buque está por zarpar. ¿Qué banderas deben estar izadas?',
+    ['Pabellón nacional, «H» (tengo práctico a bordo) y «P» (el buque está por zarpar).','Pabellón nacional, «G» (necesito práctico) y «Q» (solicito libre plática).','Pabellón nacional, «H» (tengo práctico a bordo) y «Q» (solicito libre plática).'],
+    '«G» es «necesito práctico»: se arría cuando embarca y se iza «H». «Q» pide libre plática y es de llegada. «P» en puerto avisa que el buque está por hacerse a la mar. De paso, anota la hora en que el práctico confirmó la Pilot Card.',
+    'Práctico confirma que no tiene duda sobre la Pilot Card. Izadas banderas H y P.',{on:()=>{X.pt.card=X.min;}});
+  add(2,['2.1'],'reg','Autorización de salida al VTS','Capitán','Pida la salida a Control de Tráfico.','¿Cómo llamas?',
+    [`«Control de Tráfico, Control de Tráfico, aquí buque ${SHIP}, ${SHIP}, canal 14. Solicito autorización para salir del muelle Richmond tramo 48-3. Cambio».`,`«Control de Tráfico, aquí el ${SHIP}, canal 14. Ya largamos cabos y vamos saliendo del muelle Richmond tramo 48-3, para su conocimiento y control. Cambio y fuera».`,`«Atención a todos los buques, a todos los buques, aquí ${SHIP} por canal 16: salimos del muelle Richmond tramo 48-3, favor de mantenerse claros. Cambio».`],
+    'Estructura SMCP: a quién llamas, quién eres, canal, y el mensaje con su marcador («solicito», en inglés REQUEST). «Cambio y fuera» no existe: «cambio» espera respuesta y «fuera» termina. No sales hasta tener la autorización.',
+    'Solicitada autorización de salida a Control de Tráfico por VHF 14. Autorizado.');
+  add(2,['2.2'],'reg','Calados, destino y condición','Control de Tráfico',`${SHIP}, informe calados, destino y condición.`,'¿Qué contestas? Usa la hoja del ejercicio.',
+    [`«Calado a proa ${dec(D.fwd)} metros, a popa ${dec(D.aft)} metros. Destino ${D.dest}. Práctico a bordo, dos remolcadores asignados».`,`«Calado a proa ${dec(D.aft)} metros, a popa ${dec(D.fwd)} metros. Destino ${D.dest}. Práctico a bordo, dos remolcadores asignados».`,`«Calado máximo de unos ${Math.round(D.aft)} metros, más o menos. Destino ${D.dest}. Práctico a bordo y dos remolcadores asignados».`],
+    'Criterio 2.2: transmitir «de forma exacta». Los números se dicen cifra por cifra con «decimal», sin redondear y sin cambiar proa por popa.');
+  add(2,['2.3'],'reg','Enlace con remolcadores','Capitán','Enlace con los remolcadores.','¿En qué canal y cómo?',
+    [`En el 71: «Remolcador Uno, Remolcador Uno, aquí ${SHIP} por canal 71, ¿cómo me copia?». Repito con Remolcador Dos.`,`En el 16: «Remolcador Uno, Remolcador Dos, aquí ${SHIP}, ¿cómo me copian?», y ahí mismo coordino la maniobra con ellos.`,`En el 14: «Remolcador Uno, Remolcador Uno, aquí ${SHIP} por canal 14, ¿cómo me copia?». Repito con Remolcador Dos.`],
+    'Criterio 2.3: el canal de trabajo correcto. La hoja lo fija en el 71. El 16 es de socorro, urgencia, seguridad y llamada; el 14 es el de Control de Tráfico.',
+    'Enlace por VHF 71 con Remolcador 1 (proa) y Remolcador 2 (popa).');
+  add(2,['2.4'],'reg','Remolcadores firmes','Remolcador Dos','Puente, Remolcador Dos, cabo encapillado en popa.','¿Qué contestas y qué informas?',
+    ['«Remolcador Dos, recibido: firme a popa». Y al Capitán y al práctico: «Remolcador Dos firme a popa».','«Okey, gracias, Remolcador Dos». No interrumpo al Capitán ni al práctico: ellos ya lo oyeron en el radio.','No contesto para no ocupar el canal 71; solo anoto la hora y aviso al Capitán cuando me lo pregunte.'],
+    'Criterio 2.4: confirmar con mensajes normalizados que la asistencia está firme (en inglés «tug is fast»). Acusas recibo al remolcador y lo informas al mando. Anota la hora.',
+    'Remolcador 1 firme a proa y Remolcador 2 firme a popa.');
+  S.push({type:'order',sec:3,ord:o[0],who:'Práctico',t:'Primera orden del práctico',log:()=>`Primera orden del práctico: ${o[0].es.toLowerCase()}.`,on:()=>{X.pt.first=X.min;}});
+  add(3,null,'bit','Las tres horas del práctico','Capitán','Revise que el diario tenga lo del práctico.','¿Qué asientos del práctico exige la hoja del examen?',
+    ()=>[`${hm(X.pt.emb)} práctico a bordo; ${hm(X.pt.card)} confirma que no tiene duda de la Pilot Card; ${hm(X.pt.first)} primera orden.`,`${hm(X.pt.emb)} práctico a bordo; ${hm(X.pt.first)} primera orden del práctico. La Pilot Card se archiva, no se asienta.`,`${hm(X.pt.emb)} práctico a bordo y a cargo de la maniobra. Con ese asiento basta hasta que desembarque.`],
+    'Está en la primera hoja: «es de suma importancia anotar en la bitácora la hora de embarque del piloto, la hora en que confirma que no tiene duda sobre la Pilot Card entregada y la hora de la primera orden».');
+  add(3,['3.1'],'man','Distancias al muelle','Popa','Puente, popa: quince metros al muelle, cerrando.','¿Qué haces con ese reporte?',
+    ['Lo repito de inmediato en voz alta: «Popa a quince metros del muelle, cerrando», y sigo cantando cada distancia que llegue.','Lo anoto con su hora en la bitácora y se lo comento al práctico en cuanto termine de dar la orden que está dando, para no interrumpirlo.','Contesto «recibido, popa» y aviso al práctico solo si la distancia baja de cinco metros, para no distraerlo.'],
+    'Criterio 3.1: informar «en voz alta y de forma continua». El práctico no escucha el radio de cubierta; tú eres quien le pasa las distancias a muelle, defensas y obstáculos.');
+  S.push({type:'order',sec:3,ord:o[1],who:'Práctico',t:'Orden de timón',log:()=>`${o[1].es}.`});
+  add(3,['3.4'],'man','Axiómetro y repetidor','Práctico',`${o[1].es}.`,'Ya ejecutaste la orden. ¿Qué sigue?',
+    [`Miro el axiómetro hasta que marque ${ang}° a ${side}, veo en el repetidor que la proa empieza a caer a ${side} e informo: «Timón a ${side} ${ang}, señor».`,`Como ya metí la caña a ${side} ${ang}, informo «timón a ${side} ${ang}, señor» y vuelvo a la bitácora mientras el buque cae.`,`Miro la caña para confirmar que quedó en ${ang}° a ${side} y espero a que el práctico pregunte si la proa ya está cayendo.`],
+    'Criterio 3.4: confirmar en el indicador de ángulo de timón que llegó a lo ordenado y en el repetidor que el buque inicia el giro. Si el timón no llega o la proa no cae, es una falla y se informa en el acto.');
+  add(3,['3.2'],'man','Abatimiento','Práctico','Vamos separando del muelle.','El viento sopla del 020° con rachas de 22 nudos y el Doppler marca 0.3 nudos de movimiento lateral de regreso hacia el muelle. ¿Qué haces?',
+    ['Informo de inmediato: «Práctico, el buque abate hacia el muelle, cero decimal tres nudos».','Corrijo yo con un toque de hélice de proa hacia afuera y después le informo al práctico lo que hice.','Sigo vigilando el Doppler: con 0.3 nudos todavía no hace falta distraer al práctico con el dato.'],
+    'Criterio 3.2: monitorear y reportar de inmediato. A este nivel no decides la maniobra: informas el dato y el Capitán o el práctico ordenan.');
+  add(3,['C2'],'reg','Vigilancia sin distracciones','Agencia','(Suena el celular: la agencia pide la hora estimada de desembarque del práctico.)','Están a media maniobra de desatraque. ¿Qué haces?',
+    ['No atiendo: sigo en la vigilancia y en mis instrumentos. La agencia se contesta cuando el buque esté claro o lo hace quien no esté de guardia.','Contesto rápido, sin dejar de ver hacia afuera, y de paso reviso el correo de la agencia para darle la hora exacta de una vez y no volver a distraerme.','Salgo un momento al alerón a contestar para no hacer ruido en el puente; desde ahí también puedo vigilar la popa.'],
+    'Tarea crítica C2: vigilancia visual y de radar en todo momento, sin tareas ajenas a la guardia (Regla 5). Fallarla es reprobación automática. La comunicación con la agencia se evalúa, pero no a costa de la vigilancia.');
+  S.push({type:'order',sec:3,ord:o[2],who:'Práctico',t:'Orden final del desatraque',log:()=>`${o[2].es}.`});
+  add(3,null,'bit','Asiento del zarpe','Proa','Puente, proa: largado el último cabo.','¿Cuál asiento es el correcto?',
+    ()=>[`${hm(X.min)} Largado último cabo, buque libre del muelle Richmond tr. 48-3. Remolcador 1 firme a proa y 2 a popa. Viento N 19 kn, corriente 252° 0.4 kn. Práctico al mando de la maniobra.`,`${hm(X.min)} Zarpamos del muelle Richmond con práctico y dos remolcadores. Maniobra normal, tiempo regular con viento del norte. Sin novedad en la tripulación ni en la carga.`,'Largado último cabo, buque libre del muelle. Remolcador 1 firme a proa y 2 a popa. Viento N 19 kn, corriente 252° 0.4 kn. Práctico al mando de la maniobra y tripulación en sus estaciones.'],
+    'El zarpe es un evento importante de la travesía: hora, lugar, último cabo, remolcadores y condiciones. Sin la hora y el tramo, o con «tiempo regular» en lugar de las cifras, el asiento queda incompleto.',
+    'Largado último cabo. Buque libre del muelle Richmond tr. 48-3 con Remolcador 1 a proa y 2 a popa.');
+  add(4,['4.1'],'ayu','Marcas de enfilación','Práctico','Siga la enfilación.','Ves la marca posterior (la alta) a la derecha de la anterior (la baja). ¿Dónde estás y qué haces?',
+    ['Estoy a la derecha del eje: lo informo y corrijo a babor hasta que queden una sobre otra.','Estoy a la izquierda del eje: lo informo y corrijo a estribor hasta que queden alineadas.','Estoy sobre el eje: la posterior siempre se ve un poco abierta. Mantengo el rumbo y lo informo.'],
+    'Criterio 4.1. Las marcas alineadas, una encima de la otra, indican que estás sobre el eje. Si la posterior se ve a la derecha de la anterior, estás a la derecha: gobiernas hacia la anterior (la baja), aquí a babor.');
+  S.push({type:'num',sec:4,it:['4.2'],con:'ayu',t:'Margen bajo la quilla',who:'Práctico',say:'Vamos entrando al punto más bajo del canal.',
+    q:`La carta marca ${D.chart.toFixed(1)} m de sonda, la marea es de 1.0 m y tu calado máximo es ${D.aft.toFixed(1)} m. ¿Qué margen bajo la quilla (UKC) reportas, en metros?`,ans:ukc,tol:.06,unit:'m',
+    why:`UKC = sonda de carta + marea − calado máximo = ${D.chart.toFixed(1)} + 1.0 − ${D.aft.toFixed(1)} = ${ukc.toFixed(1)} m. Compáralo con la ecosonda y repórtalo en los puntos críticos. Con velocidad el buque además se hunde un poco (squat): otra razón para respetar el límite del canal.`,
+    log:`Punto crítico del canal interior: margen bajo la quilla ${ukc.toFixed(1)} m.`});
+  add(4,['4.3'],'ayu','STW contra SOG','Práctico','¿Velocidad?','La corredera marca 5.0 nudos (STW) y el GPS 4.6 nudos (SOG). ¿Qué informas?',
+    ['«Velocidad en el agua cinco decimal cero, sobre el fondo cuatro decimal seis: hay cero decimal cuatro nudos de corriente en contra».','«Velocidad cinco nudos». Informo solo la corredera, porque el GPS tiene retraso y dentro del canal no es confiable.','«Velocidad en el agua cinco decimal cero, sobre el fondo cuatro decimal seis: hay cero decimal cuatro nudos de corriente a favor».'],
+    'Criterio 4.3: comparar las dos y reportar la diferencia. Si la SOG es menor que la STW, la corriente va en contra; si es mayor, a favor. STW es respecto al agua y SOG respecto al fondo; la diferencia es la corriente, que la hoja da en 0.4 nudos.');
+  add(4,null,'reg','Límite de velocidad del canal','Práctico','Media avante.','Ejecutaste la orden y minutos después el GPS marca 5.7 nudos, todavía en el canal interior. ¿Qué haces?',
+    ['Informo: «Práctico, velocidad cinco decimal siete; el límite del canal interior es cinco nudos».','Bajo yo el telégrafo a poca avante para volver a cinco nudos y le aviso al práctico cuando ya esté hecho.','Nada: él ordenó media avante y conoce el canal; anoto la velocidad en la bitácora por si la piden.'],
+    'La hoja fija 5 nudos en el canal interior y 10 en el principal. No cambias la máquina por tu cuenta, pero sí estás obligada a informar lo que marcan los instrumentos.');
+  add(4,['4.4'],'ayu','Boyas del canal','Vigía','Boya por la amura de babor.','Vas saliendo y por la amura de babor ves una boya roja con el número 6. ¿Qué informas?',
+    ['«Boya roja número 6 por la amura de babor». Es correcto: saliendo, las rojas quedan por babor.','«Boya roja por babor: vamos del lado equivocado, las rojas deben quedar siempre por estribor».','No informo: es una boya del canal, está en la carta y el práctico la tiene a la vista desde antes.'],
+    'Criterio 4.4: identificar e informar el avistamiento. En la región B del IALA (América) las rojas, de número par, quedan por estribor al entrar y por babor al salir. Si el área que te pongan en el simulador es de región A, los colores se invierten: confírmalo en la carta.');
+  add(5,['5.1'],'ayu','Adquisición de blancos','Capitán','Entramos al canal principal. ¿Qué tiene en el radar?','Hay ecos sin adquirir y uno acaba de salir detrás de una punta de tierra. ¿Qué haces?',
+    ['Adquiero manualmente los ecos que se aproximan, alterno la escala y reviso los sectores ciegos y de sombra del radar; no espero a la adquisición automática.','Dejo la adquisición automática con su zona de guardia y espero la alarma del ARPA; mientras tanto no toco la escala para no perder los vectores ya calculados.','Me quedo en la escala de 12 millas para ver lejos y adquiero solo el eco más grande, que es el que representa el mayor riesgo.'],
+    'Criterio 5.1. El ARPA tarda en dar datos confiables después de adquirir, así que se adquiere temprano. Los palos y la tierra dejan sectores sin eco: ahí también cuenta la vigilancia visual.');
+  add(5,['5.2'],'ayu','Reporte ARPA al Capitán','Capitán','¿Qué tiene el blanco A?',`El ARPA da para el blanco A: demora ${pad3(t.brg)}°, distancia ${t.rng.toFixed(1)} mn, CPA ${t.cpa.toFixed(1)} mn, TCPA ${t.tcpa} min. ¿Cómo lo reportas?`,
+    [`«Blanco A: demora ${pad3(t.brg)}, distancia ${dec(t.rng)} millas, CPA ${dec(t.cpa)} millas, TCPA ${t.tcpa} minutos».`,`«Blanco A a ${dec(t.rng)} millas por la amura, viene cerca; yo creo que pasa claro en unos ${t.tcpa} minutos».`,`«Blanco A: distancia ${dec(t.rng)} millas, demora ${pad3(t.brg)}, TCPA ${t.tcpa} minutos, pasa cerca».`],
+    'Criterio 5.2: los cuatro parámetros, completos y siempre en el mismo orden: demora, distancia, CPA y TCPA.');
+  S.push({sec:5,t:'Blanco en rumbo de colisión',who:'Agencia',say:`${SHIP}, aquí la agencia: ¿me confirma la hora estimada de desembarque del práctico?`,q:'¿Qué le contestas a la agencia?',
+    a:['«En unos cuarenta minutos, le confirmo».','«Espere, lo calculo en la carta».','«Pregúntele a Control de Tráfico».'],
+    trap:{ids:['C3'],con:'eme',watch:'Blanco B por la amura de Er: demora 040° sin cambiar, distancia 1.8 → 1.5 mn, CPA 0.1 mn, TCPA 6 min.',
+      ok:'«Capitán: blanco B por la amura de estribor, demora 040 constante, distancia uno decimal cinco millas, CPA cero decimal uno, TCPA seis minutos».',
+      why:'Mientras contestabas a la agencia, el panel de vigilancia mostraba un blanco con demora constante y distancia bajando: riesgo de abordaje (Regla 7). Tarea crítica C3: alerta de voz inmediata al Capitán. La agencia espera.'},
+    log:'Blanco B con demora constante y CPA 0.1 mn. Informado al Capitán.'});
+  add(5,['5.3'],'reg','Luces, marcas y señales','Capitán','¿Qué es ese buque?',D.mark.q,D.mark.a,D.mark.why);
+  add(5,['5.4'],'reg','Escucha en 16/14','Control de Tráfico','(Por canal 14) A todos los buques: buque tanque entrando por la boya de recalada, restringido por su calado.','Estás trabajando en el 71 con los remolcadores. ¿Qué haces con ese aviso?',
+    ['Mantengo doble escucha (o el segundo equipo) en 16 y 14, anoto hora, estación y contenido del aviso y lo informo al Capitán.','Sigo en el 71: los avisos del 14 son para los buques que entran, y el práctico trae su propio radio para oírlos y avisarnos si hace falta.','Lo escucho en el segundo equipo, pero no lo anoto ni interrumpo: no es un aviso dirigido a nuestro buque.'],
+    'Criterio 5.4: escucha ininterrumpida en el canal de seguridad y anotar los reportes relevantes. El canal de trabajo no te releva de la escucha.',
+    'VHF 14, Control de Tráfico: buque tanque restringido por su calado entrando por la boya de recalada. Informado al Capitán.');
+  S.push({type:'convoy',sec:6,t:'Convoy',who:'Capitán',say:'Nos incorporamos al convoy detrás del buque que va por la proa. Velocidad del grupo 8 nudos, distancia 0.5 millas. Avíseme si baja de 0.4.',
+    log:'Incorporados al convoy. Velocidad del grupo 8 kn, distancia al precedente 0.5 mn.',min:8});
+  add(6,['6.4'],'bit','Asiento del convoy','Capitán','Asiente lo del convoy.','¿Cuál asiento es el correcto?',
+    ()=>[`${hm(X.min)} En convoy, rumbo 252°, 8 kn. Distancia al buque precedente 0.5 mn. Reportado a Control de Tráfico por VHF 14.`,`${hm(X.min)} Navegando en convoy por el canal principal, a la velocidad del grupo y a distancia segura. Sin novedad en la guardia.`,'En convoy, rumbo 252°, 8 kn. Distancia al buque precedente 0.5 mn. Reportado a Control de Tráfico.'],
+    'Criterio 6.4: rumbos, velocidades y horas de reporte del grupo.');
+  S.push({sec:7,t:D.blackout?'Blackout':'Pérdida de respuesta del timón',who:'Capitán',say:'Oficial, deme la presión barométrica para el diario.',q:'¿Qué le contestas?',
+    a:['«1014 milibares, Capitán».','«1041 milibares, Capitán».','«Ahorita la leo en el barómetro».'],
+    trap:D.blackout?{ids:['7.1','C3'],con:'eme',watch:'Se apagan el radar y las luces del puente. Alarma de falla de energía. Revoluciones cayendo a cero, axiómetro sin respuesta.',
+      ok:'«¡Capitán, blackout! Sin energía en el puente, máquina parada y timón sin respuesta».',
+      why:'El panel de vigilancia mostraba el blackout: pantallas apagadas, alarma de energía y la máquina cayendo. Criterio 7.1 y tarea crítica C3: alarma verbal inmediata. La presión puede esperar.'}
+     :{ids:['7.1','C3'],con:'eme',watch:'Axiómetro fijo en Er 5° con la caña a la vía. La proa sigue cayendo a estribor. Alarma del servomotor.',
+      ok:'«¡Capitán, el timón no responde! Axiómetro fijo a estribor cinco, la proa cae a estribor».',
+      why:'El panel de vigilancia mostraba la falla: el axiómetro no seguía a la caña y sonaba la alarma del servomotor. Criterio 7.1 y tarea crítica C3: alarma verbal inmediata. La presión puede esperar.'},
+    log:D.blackout?'Blackout: sin energía, máquina parada y timón sin respuesta. Alarma dada al Capitán.':'Falla de gobierno: el timón no responde. Alarma dada al Capitán.'});
+  add(7,['7.2'],'eme','Cambio de modo de gobierno','Capitán',D.blackout?'Entró el generador de emergencia. ¡Cambie a gobierno manual, segunda bomba!':'¡Cambie a gobierno manual, segunda bomba!','¿Qué haces?',
+    ['Repito «cambiando a gobierno manual, segunda bomba», paso el selector de automático a manual (o al mando de respaldo), arranco la otra bomba e informo si el axiómetro ya responde.','Repito «cambiando a manual» y sigo unos segundos con el piloto automático para ver si regresa solo; si no responde, entonces paso el selector y arranco la segunda bomba.','Dejo el puente al timonel y bajo corriendo al cuarto del servomotor para arrancar la segunda bomba ahí mismo y gobernar con el mando local de emergencia.'],
+    'Criterio 7.2: ejecutar la orden directa y confirmar el resultado. El orden es el de siempre: repetir, ejecutar, verificar en el axiómetro e informar.');
+  add(7,['7.3'],'eme','Buque sin gobierno','Capitán','Seguimos sin gobierno. Señales.','Es de día. ¿Qué exhibes y qué preparas en el VHF?',
+    ['Izo dos bolas negras en vertical (de noche, dos rojas todo horizonte y apago las de tope) y dejo el VHF en el 16, listo para el mensaje que ordene el Capitán.','Izo una bola negra a proa (de noche, una luz blanca todo horizonte) y llamo yo mismo por el 16 a todos los buques para avisar que estamos sin gobierno.','Izo bola, bicono y bola en vertical (de noche, roja, blanca y roja todo horizonte) y dejo el VHF en el 71 para seguir con los remolcadores.'],
+    'Criterio 7.3. Regla 27(a): buque sin gobierno, dos bolas de día y dos rojas todo horizonte de noche; con arrancada conserva luces de costado y de alcance, sin luces de tope. Una bola es buque fondeado (Regla 30).',
+    'Izadas dos bolas: buque sin gobierno. VHF en canal 16.');
+  add(7,['7.4'],'eme','Disciplina en el puente','Capitán','(El Capitán y el práctico están resolviendo la falla.)','¿Cómo te conduces mientras tanto?',
+    ['En silencio: repito órdenes, doy los datos que me piden, sigo vigilando y no transmito nada por radio sin orden del Capitán.','Propongo en voz alta fondear de inmediato y voy llamando a los remolcadores por el 71 para adelantar la maniobra.','Explico por el 16 lo que está pasando para que los demás buques sepan, y le voy sugiriendo opciones al práctico para ahorrarle tiempo.'],
+    'Criterio 7.4: disciplina de radio y silencio en el puente, sin interferir con las decisiones del Capitán. Hablas para repetir, informar y alertar.');
+  add(7,null,'bit','Asiento de la falla','Capitán','Gobierno restablecido con la segunda bomba. Asiente lo ocurrido.','¿Cuál asiento es el correcto?',
+    ()=>[`${hm(X.min)} En el canal principal, ${D.blackout?'blackout: sin energía, máquina parada y timón sin respuesta. Entra el generador de emergencia, se':'falla de gobierno: timón sin respuesta. Se'} cambia a manual con la bomba 2, se izan dos bolas y se pone VHF en 16. Gobierno restablecido, se arrían las bolas. Sin daños. Informado Control de Tráfico.`,`${hm(X.min)} Falló ${D.blackout?'la energía':'el timón'} un momento en el canal principal. Máquinas lo corrigió enseguida y todo volvió a la normalidad. No hubo daños ni lesionados y se continúa la navegación sin más novedad que reportar.`,`${hm(X.min)} En el canal principal, ${D.blackout?'blackout':'falla de gobierno'}. Se avisa al Capitán y a máquinas, que atienden la falla. Gobierno restablecido a los pocos minutos. Sin daños. Se continúa navegando en el canal a la velocidad ordenada por el práctico.`],
+    'Hora, lugar, qué falló, qué se hizo y cómo quedó. Es el asiento que más revisa una autoridad después de un incidente.',
+    'Gobierno restablecido con la bomba 2. Se arrían las bolas. Sin daños.');
+  add(8,null,'eme','Zafarrancho de hombre al agua','Capitán','Tercer oficial: dé la plática del zafarrancho de hombre al agua.','¿Qué debe incluir y qué llenas después?',
+    ['Acciones inmediatas (aro, timón a la banda de la caída, botón MOB, vigía, alarma y aviso al Capitán), maniobra de regreso, bote de rescate y funciones de cada quien. Después lleno el reporte de simulacros con firmas y lo asiento en bitácora.','Leo en voz alta el cuadro de obligaciones y la maniobra de Williamson, pregunto si hay dudas y paso lista de asistencia. No hace falta formato porque es plática y no un zafarrancho completo; basta con avisar al Capitán.','Acciones inmediatas (parar máquina, timón a la banda contraria a la caída, botón MOB y aviso al Capitán), maniobra de regreso y bote de rescate. Después lleno el reporte de simulacros con firmas y lo asiento en bitácora.'],
+    'El timón va a la banda de la caída, para alejar la popa y la hélice de la persona, y no se pierde de vista al náufrago. La hoja dice que la plática del zafarrancho de hombre al agua la da el tercer oficial y que se llena formato. Respuesta ante emergencias vale 20 %.',
+    'Zafarrancho de hombre al agua. Plática a cargo del tercer oficial. Formato llenado.');
+  add(8,null,'man','Desembarque del práctico','Práctico','Me bajo aquí. Lancha por la aleta.','El GPS marca 4.2 nudos. ¿Qué haces?',
+    ['Informo: «Capitán, velocidad cuatro decimal dos; el límite para desembarcar al práctico es tres nudos». Escala lista por sotavento, con oficial, aro y radio.','Nada: 4.2 nudos es buena velocidad para que la lancha se abarloe. Dejo la escala lista por barlovento, con oficial, aro y radio.','Paro la máquina por mi cuenta para bajar a tres nudos y después informo al Capitán. Escala lista por sotavento, con oficial, aro salvavidas, radio y buena iluminación.'],
+    'La hoja fija velocidad máxima de 3 nudos para el desembarque. La escala va por la banda de sotavento para abrigar a la lancha. Al desembarcar se arría la «H».');
+  add(8,null,'bit','Asiento del desembarque','Capitán','Práctico desembarcado.','¿Cuál asiento es el correcto?',
+    ()=>[`${hm(X.min)} Desembarca el práctico por la banda de sotavento, a 2.8 kn, frente a la boya de recalada. Se arría la bandera H. El Capitán toma el mando de la navegación.`,`${hm(X.min)} Se fue el práctico en su lancha frente a la boya de recalada. Maniobra normal y sin novedad. Se continúa el viaje a ${D.dest} con buen tiempo y toda la tripulación a bordo.`,`${hm(X.min)} Desembarca el práctico frente a la boya de recalada. Se arría la bandera H y se iza la G. El Capitán toma el mando de la navegación.`],
+    'Hora, lugar, banda y velocidad del desembarque, y quién queda al mando.',
+    'Práctico desembarcado a 2.8 kn. Arriada bandera H.');
+  return S;
+}
+
+function xlog(txt){X.log.push({t:hm(X.min),txt});$('x-log').innerHTML=X.log.slice().reverse().map(l=>`<div><span>${l.t}</span>${l.txt}</div>`).join('');}
+function setWatch(txt,hot){const w=$('x-watch');w.textContent=txt;w.className='watch'+(hot?' hot':'');}
+function mark(ids,ok,con,t,why){X.marks.push({ids:ids||[],ok,con,t,why,sec:X.steps[X.i].sec});}
+
+function xintro(){
+  X={on:false,D:newData(),log:[]};
+  renderData(); $('x-log').innerHTML=''; setWatch('Sin novedad.');
+  let h=[]; try{h=JSON.parse(localStorage.getItem('simguardia.examen')||'[]');}catch(e){}
+  const b=$('x-step'); b.className='panel brief';
+  b.innerHTML=`<div class="label">Examen de ascenso · simulador de puente</div><h2>Zarpe con práctico y remolcadores</h2>
+    <p>Sigue la hoja del examen: abres la guardia a las 0800 atracada, preparas el puente, embarcas al práctico, zarpas con dos remolcadores, sales por el canal, te incorporas a un convoy y atiendes una falla. Tu papel es el de la hoja de evaluación: ejecutas las órdenes del Capitán y del práctico, vigilas, lees instrumentos, comunicas y anotas.</p>
+    <p>Arriba está el panel de <b>vigilancia</b>. Revísalo en cada paso: si aparece un blanco en rumbo de colisión o una falla, lo primero es el botón de alerta al Capitán, antes que cualquier otra cosa.</p>
+    <p class="kbd">Se califica como la hoja: 3 tareas críticas obligatorias y al menos 20 de 28 criterios generales. Los datos y las órdenes cambian en cada intento.</p>
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-start="1">Modo estudio</button><button class="btn" data-start="0">Modo examen</button></div>
+    <p class="hint" style="margin-top:8px">Estudio: explica cada respuesta al momento. Examen: sin ayudas, el resultado sale al final.</p>
+    ${h.length?`<div class="label" style="margin-top:14px">Intentos anteriores</div><div class="log" style="margin-top:6px">${h.map(r=>`<div><span>${r.d}</span>${r.ok?'Aprobado':'Reprobado'} · críticas ${r.c}/3 · generales ${r.g}/28 · ${r.p} %</div>`).join('')}</div>`:''}`;
+}
+function xstart(study){
+  X.on=true;X.study=study;X.marks=[];X.log=[];X.min=8*60;X.pt={};X.inst={rud:0,eng:'ST'};X.steps=build();
+  $('x-log').innerHTML=''; enter(0);
+}
+function enter(i){
+  X.i=i; const s=X.steps[i]; if(s.on)s.on();
+  X.sel=null;X.fbOk=null;X.fbMsg='';X.rb=null;
+  if(s.type==='order'){X.ph='rb';X.a=[s.ord.es+'.',s.ord.inv+'.','Enterado, práctico.'];}
+  else if(s.type==='convoy'){X.ph='cv';X.a=[];X.cv={t:0,d:.5,own:8,ord:8,lead:8,minD:.5,meas:0,last:null,lastT:0,belowT:null,alertT:null};}
+  else {X.ph='q';X.a=val(s.a)||[];}
+  X.order=shuffle(X.a?X.a.map((_,k)=>k):[]);
+  if(X.flash){setWatch(X.flash+(s.trap?' '+s.trap.watch:''),true);X.flash=null;}
+  else setWatch(s.trap?s.trap.watch:'Sin novedad.',false);
+  show(); $('x-step').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function done(ok,msg){
+  const s=X.steps[X.i]; if(s.log)xlog(val(s.log));
+  if(s.trap)setWatch(s.trap.watch,true);
+  if(X.study){X.ph='fb';X.fbOk=ok;X.fbMsg=msg||s.why||'';show();} else next();
+}
+function next(){
+  X.min+=X.steps[X.i].min||3;
+  if(X.i+1<X.steps.length)enter(X.i+1); else finish();
+}
+function choose(k){
+  const s=X.steps[X.i];
+  if(X.ph==='rb'){X.rb=k===0;mark(['3.3'],k===0,'man','Read-back: '+s.ord.es.toLowerCase(),`La orden se repite palabra por palabra antes de tocar el mando: «${s.ord.es}». «Enterado» no sirve: el práctico necesita oír que entendiste la banda y la cantidad.`);X.ph='exec';show();return;}
+  if(X.ph!=='q')return;
+  X.sel=k;
+  if(s.trap){mark(s.trap.ids,false,s.trap.con,s.t,s.trap.why);done(false,s.trap.why);return;}
+  mark(s.it,k===0,s.con,s.t,s.why); done(k===0);
+}
+function exec(t,v){
+  if(X.ph!=='exec')return; const s=X.steps[X.i],o=s.ord,ok=t===o.t&&v===o.v;
+  const ahead=e=>'FA HA SA DA'.includes(e), astern=e=>'FS HS SS DS'.includes(e);
+  const inv=t===o.t&&(t==='rud'?v*o.v<0:(ahead(v)&&astern(o.v))||(astern(v)&&ahead(o.v)));
+  const did=t==='rud'?XRUD.find(r=>r[0]===v)[1]:XENG.find(e=>e[0]===v)[1];
+  if(t==='rud')X.inst.rud=v; else X.inst.eng=v;
+  const why=ok?`Orden cumplida: «${o.es}» (SMCP: «${o.en}»).`:`La orden fue «${o.es}» y pusiste «${did}». ${inv?'Invertiste la banda o el sentido de la máquina: ':'No es lo que se ordenó: '}la tarea crítica C1 pide ejecutar exactamente, y fallarla es reprobación automática.`;
+  mark(['C1'],ok,'man','Ejecución: '+o.es.toLowerCase(),why);
+  done(ok,(X.rb?'':`El read-back correcto era «${o.es}». `)+why);
+}
+function num(v){
+  if(X.ph!=='q')return; const s=X.steps[X.i]; if(isNaN(v))return;
+  const ok=Math.abs(v-s.ans)<=s.tol; X.sel=v; mark(s.it,ok,s.con,s.t,s.why); done(ok);
+}
+// El botón siempre contesta algo en el panel de vigilancia: si no, parece que no funciona.
+function alertCap(){
+  const btn=$('x-alert'); btn.classList.add('fired'); setTimeout(()=>btn.classList.remove('fired'),350);
+  if(!X.on){setWatch('Inicia un intento para usar la alerta.',false);return;}
+  const s=X.steps[X.i];
+  if(X.ph==='q'&&s.trap){
+    mark(s.trap.ids,true,s.trap.con,s.t,s.trap.why);X.sel=-1;
+    if(!X.study)X.flash='Alerta dada al Capitán, que acusa recibo.'; // en modo examen el paso avanza solo: que quede a la vista
+    done(true,`Bien: alertaste antes que cualquier otra cosa. ${s.trap.ok}`);
+  }
+  else if(X.ph==='cv'){
+    const c=X.cv;
+    if(c.alertT!=null)setWatch('El Capitán ya está enterado de la distancia. Sigue midiendo y ajustando.',true);
+    else if(c.d<.45){c.alertT=c.t;setWatch('«Capitán, distancia al precedente bajando del límite». El Capitán acusa recibo.',true);}
+    else setWatch('El Capitán revisa el radar: «la distancia sigue arriba del límite». Mide con el VRM antes de alertar.',false);
+  }
+  else if(X.ph==='fb')setWatch('Este paso ya se calificó. Continúa con «Siguiente».',false);
+  else setWatch('El Capitán voltea, revisa y contesta: «sin novedad». Alertar de más no resta.',false);
+}
+
+// Convoy: 1 s real = 20 s simulados. El buque de adelante baja de 8 a 6.5 kn y luego recupera.
+function cvTick(dt){
+  const c=X.cv; if(!X.on||X.ph!=='cv'||!c)return;
+  c.t+=dt; c.lead=c.t>10&&c.t<28?6.5:8;
+  c.own+=Math.max(-.2*dt,Math.min(.2*dt,c.ord-c.own));
+  c.d+=(c.lead-c.own)/180*dt; c.minD=Math.min(c.minD,c.d);
+  if(c.d<.4&&c.belowT==null)c.belowT=c.t;
+  if(c.d<.05||c.t>=45){cvEnd();return;}
+  const e=$('x-cv');if(e)e.innerHTML=cvReadout();
+}
+function cvReadout(){
+  const c=X.cv,age=c.last==null?null:c.t-c.lastT;
+  return `<div class="ro"><span>Tiempo</span><b>${Math.max(0,45-c.t).toFixed(0)} s</b></div><div class="ro"><span>Velocidad</span><b>${c.own.toFixed(1)} kn</b></div><div class="ro"><span>Ordenado</span><b>${(c.ord*10).toFixed(0)} rpm</b></div><div class="ro"><span>VRM</span><b>${c.last==null?'sin medir':c.last.toFixed(2)+' mn'}</b></div>${age!=null&&age>4?'<p class="hint" style="grid-column:1/-1">La última medición ya es vieja: vuelve a medir.</p>':''}`;
+}
+function cvEnd(){
+  const c=X.cv, ok1=Math.abs(c.own-c.lead)<=.6&&c.minD>=.3&&c.d>=.42&&c.d<=.65, ok2=c.meas>=4, ok3=c.belowT==null||(c.alertT!=null&&c.alertT-c.belowT<=8);
+  mark(['6.1'],ok1,'ayu','Convoy: ajuste de revoluciones',`Terminaste a ${c.own.toFixed(1)} kn con el precedente a ${c.lead.toFixed(1)} kn; distancia final ${Math.max(0,c.d).toFixed(2)} mn y mínima ${Math.max(0,c.minD).toFixed(2)} mn. En convoy se ajustan las revoluciones en cuanto cambia la distancia, sin esperar a que sea un problema.`);
+  mark(['6.2'],ok2,'ayu','Convoy: medición con VRM',`Mediste ${c.meas} ${c.meas===1?'vez':'veces'} en unos 15 minutos simulados. La distancia al precedente se mide de forma continua con el anillo variable (VRM) o el cursor.`);
+  mark(['6.3'],ok3,'ayu','Convoy: alerta de distancia',c.belowT==null?'La distancia nunca bajó del límite seguro de 0.4 mn.':c.alertT!=null?'Alertaste al Capitán cuando la distancia bajó del límite.':'La distancia bajó de 0.4 mn y no alertaste al Capitán de inmediato.');
+  done(ok1&&ok2&&ok3,`${ok1?'Mantuviste la velocidad del grupo.':'No quedaste a la velocidad del grupo o te acercaste demasiado.'} ${ok2?'Mediste la distancia con frecuencia.':'Mediste muy poco con el VRM.'} ${ok3?(c.belowT==null?'La distancia no bajó del límite.':'Alertaste a tiempo.'):'Faltó alertar al Capitán al bajar de 0.4 mn.'} El buque de adelante bajó a 6.5 nudos sin avisar y después recuperó: solo midiendo seguido te das cuenta.`);
+}
+
+function show(){
+  const s=X.steps[X.i], b=$('x-step'); b.className='panel brief';
+  const said=(who,txt)=>`<div class="said"><b>${who}</b>${txt}</div>`;
+  const opts=(dis)=>`<div class="quiz">${X.order.map(k=>`<button class="qopt ${dis?(k===0&&!s.trap?'right':k===X.sel?'wrong':''):''}" data-k="${k}" ${dis?'disabled':''}>${X.a[k]}</button>`).join('')}</div>`;
+  const ctl=`<div class="ctl"><div class="label">Timón</div><div class="seg">${XRUD.map(([v,n])=>`<button class="btn ${v<0?'port':v>0?'stbd':''}" data-xr="${v}" aria-pressed="${X.inst.rud===v}">${n}</button>`).join('')}</div></div><div class="ctl"><div class="label">Telégrafo</div><div class="seg">${XENG.map(([k,n])=>`<button class="btn" data-xe="${k}" aria-pressed="${X.inst.eng===k}">${n}</button>`).join('')}</div></div>`;
+  let h=`<div class="label">${hm(X.min)} · Paso ${X.i+1} de ${X.steps.length} · ${s.sec<=7?`Sección ${s.sec}: `:''}${SECS[s.sec]}</div><h2>${s.t}</h2>`;
+  if(X.ph==='fb'){
+    h+=said(s.who,s.type==='order'?`${s.ord.es}.`:s.say);
+    if(s.type==='num')h+=`<p>${s.q}</p><p class="kbd">Tu respuesta: ${X.sel} ${s.unit}</p>`;
+    else if(X.a&&X.a.length&&s.type!=='order')h+=`<div class="label">${s.q}</div>`+opts(true);
+    h+=`<div class="explain" style="margin-top:10px"><b>${X.fbOk?'Correcto.':'No es correcto.'}</b> ${X.fbMsg}</div><div class="row" style="margin-top:12px"><button class="btn primary" id="x-next">${X.i+1<X.steps.length?'Siguiente':'Ver resultado'}</button></div>`;
+  } else if(X.ph==='rb'){
+    h+=said(s.who,`${s.ord.es}.`)+`<div class="label">Primero el acuse de recibo. ¿Qué dices en voz alta?</div>`+opts(false);
+  } else if(X.ph==='exec'){
+    h+=said(s.who,`${s.ord.es}.`)+`<div class="label" style="margin-bottom:8px">Ahora ejecútala en el mando</div>`+ctl;
+  } else if(X.ph==='cv'){
+    h+=said(s.who,s.say)+`<p>Durante 45 segundos mantén la velocidad y la distancia del grupo. La distancia solo la conoces si la mides con el VRM. Si baja de 0.4 millas, alerta al Capitán con el botón del panel de vigilancia.</p>
+      <div class="readout" id="x-cv">${cvReadout()}</div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" data-cv="vrm">Medir con VRM</button><button class="btn" data-cv="-">− 5 rpm</button><button class="btn" data-cv="+">+ 5 rpm</button></div>`;
+  } else if(s.type==='num'){
+    h+=said(s.who,s.say)+`<p>${s.q}</p><div class="course"><input class="numin" id="x-num" type="number" step="0.1" inputmode="decimal" aria-label="Respuesta en ${s.unit}"><span class="kbd">${s.unit}</span><button class="btn primary" id="x-numok">Reportar</button></div>`;
+  } else {
+    h+=said(s.who,s.say)+`<div class="label">${s.q}</div>`+opts(false);
+  }
+  b.innerHTML=h;
+}
+
+function finish(){
+  X.on=false; setWatch('Ejercicio terminado.');
+  const pass=id=>{const m=X.marks.filter(k=>k.ids.includes(id));return m.length>0&&m.every(k=>k.ok);};
+  const c=CRIT.filter(pass).length, g=GEN.filter(pass).length, ok=c===3&&g>=20;
+  const cons=Object.keys(CON).map(k=>{const m=X.marks.filter(x=>x.con===k);return {k,p:m.length?m.filter(x=>x.ok).length/m.length*100:0};});
+  const p=Math.round(cons.reduce((a,x)=>a+x.p,0)/cons.length);
+  try{const hh=JSON.parse(localStorage.getItem('simguardia.examen')||'[]');hh.unshift({d:new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short'}),ok,c,g,p});localStorage.setItem('simguardia.examen',JSON.stringify(hh.slice(0,8)));}catch(e){}
+  const li=(st,txt,small)=>`<li class="${st}"><span class="ic">${st==='ok'?'✓':'✗'}</span><div>${txt}${small?`<small>${small}</small>`:''}</div></li>`;
+  const item=id=>{const bad=X.marks.filter(k=>k.ids.includes(id)&&!k.ok);return li(pass(id)?'ok':'fail',`<b>${id}</b> ${ITEMS[id]}`,bad.map(k=>k.why).join(' '));};
+  let h=`<div class="label">Hoja de consolidación de resultados</div><h2 class="${ok?'verdict-ok':'verdict-bad'}">${ok?'Aprobado: competente para la guardia':'Reprobado: requiere reentrenamiento'}</h2>
+    <div class="score"><div class="ro"><span>Críticas · 3 de 3</span><b style="color:var(--${c===3?'ok':'bad'})">${c} / 3</b></div><div class="ro"><span>Generales · mín. 20</span><b style="color:var(--${g>=20?'ok':'bad'})">${g} / 28</b></div><div class="ro"><span>Ponderación · mín. 80 %</span><b style="color:var(--${p>=80?'ok':'warn'})">${p} %</b></div></div>
+    <p>${c<3?'Fallaste al menos una tarea crítica: en la hoja eso es reprobación automática, sin importar el resto.':g<20?'Cumpliste las tareas críticas, pero no alcanzaste 20 de 28 criterios generales.':p<80?'Pasas por la lista de verificación, pero la ponderación quedó abajo de 80 %: repasa los conceptos más bajos.':'Cumpliste las tres tareas críticas y el mínimo de criterios generales.'}</p>
+    <div class="sech">Ponderación por concepto (20 % cada uno)</div><ul class="checks">${cons.map(x=>li(x.p>=80?'ok':'fail',`${CON[x.k]}: ${Math.round(x.p)} %`)).join('')}</ul>
+    <p class="hint">La ponderación es una estimación de este simulador; el reparto exacto de puntos lo decide el instructor.</p>
+    <div class="sech">${SECS[0]}</div><ul class="checks">${CRIT.map(item).join('')}</ul>`;
+  for(let sct=1;sct<=7;sct++)h+=`<div class="sech">Sección ${sct}: ${SECS[sct]}</div><ul class="checks">${GEN.filter(id=>id[0]===String(sct)).map(item).join('')}</ul>`;
+  const extra=X.marks.filter(k=>!k.ids.length&&!k.ok);
+  if(extra.length)h+=`<div class="sech">Otros puntos de la hoja que fallaste</div><ul class="checks">${extra.map(k=>li('fail',k.t,k.why)).join('')}</ul>`;
+  h+=`<div class="row" style="margin-top:14px"><button class="btn primary" data-again="1">Otro intento</button></div>`;
+  const b=$('x-step'); b.className='panel brief debrief'; b.innerHTML=h; b.scrollIntoView({behavior:'smooth',block:'start'});
+  X.result={c,g,p,ok};
+}
+
+$('x-step').onclick=e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  if(b.dataset.start!=null)xstart(b.dataset.start==='1');
+  else if(b.dataset.again)xintro();
+  else if(b.id==='x-next')next();
+  else if(b.id==='x-numok')num(parseFloat($('x-num').value));
+  else if(b.dataset.k!=null)choose(+b.dataset.k);
+  else if(b.dataset.xr!=null)exec('rud',+b.dataset.xr);
+  else if(b.dataset.xe!=null)exec('eng',b.dataset.xe);
+  else if(b.dataset.cv&&X.ph==='cv'){const c=X.cv,k=b.dataset.cv;
+    if(k==='vrm'){c.meas++;c.last=c.d;c.lastT=c.t;} else c.ord=Math.max(4,Math.min(10,c.ord+(k==='+'?.5:-.5)));
+    $('x-cv').innerHTML=cvReadout();}
+};
+$('x-step').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='x-num'){e.preventDefault();num(parseFloat(e.target.value));}});
+$('x-alert').onclick=alertCap;
+setInterval(()=>{if(window.__mode==='exam')cvTick(.25);},250);
+
+xintro(); // arranque del modo examen
+})();
+</script>
+<script>
+(()=>{
+// ======================= RUEDA DE TIMÓN =======================
+// Widget de arrastre compartido. Cada modo publica en window un objeto
+// {min,max,ratio,ok,get,set,done}: ratio = grados de rueda por unidad (° de timón o ° de rumbo).
+// Mientras se arrastra llama set() sin anotar; al soltar llama done(inicial, final) para la bitácora.
+const css=getComputedStyle(document.documentElement),tok=n=>css.getPropertyValue(n).trim();
+const C={amber:tok('--amber'),muted:tok('--muted'),cyan:tok('--cyan'),wood:'#9a6a3a',woodD:'#5e3d1e',bad:'#ff8a83',ok:'#7fe3a5'};
+function wheel(cv,api){
+  if(!cv||!api)return;
+  const ctx=cv.getContext('2d');let drag=null,shown=null;
+  const angOf=e=>{const r=cv.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;return {a:Math.atan2(x,-y)*180/Math.PI,d:Math.hypot(x,y),R:r.width/2};};
+  function draw(){
+    const dpr=window.devicePixelRatio||1,w=Math.round(cv.clientWidth*dpr);if(!w)return;
+    const ang=drag?drag.acc:api.get()*api.ratio,key=w+':'+ang.toFixed(1)+':'+!!drag;if(key===shown)return;shown=key;
+    if(cv.width!==w){cv.width=cv.height=w;}
+    const c=w/2,R=w/2*.86;ctx.clearRect(0,0,w,w);
+    // marca fija de la vía (arriba)
+    ctx.fillStyle=C.cyan;ctx.beginPath();ctx.moveTo(c,w*.012);ctx.lineTo(c-w*.035,-0+w*.07);ctx.lineTo(c+w*.035,w*.07);ctx.closePath();ctx.fill();
+    ctx.save();ctx.translate(c,c);ctx.rotate(ang*Math.PI/180);
+    for(let i=0;i<8;i++){ // rayos con cabillas
+      ctx.save();ctx.rotate(i*Math.PI/4);
+      ctx.strokeStyle=i===0?C.amber:C.wood;ctx.lineWidth=R*.07;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(0,-R*.18);ctx.lineTo(0,-R*1.02);ctx.stroke();
+      ctx.fillStyle=i===0?C.amber:C.wood;ctx.beginPath();ctx.ellipse(0,-R*1.02,R*.06,R*.09,0,0,Math.PI*2);ctx.fill();
+      ctx.restore();}
+    ctx.strokeStyle=C.woodD;ctx.lineWidth=R*.16;ctx.beginPath();ctx.arc(0,0,R*.72,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle=C.wood;ctx.lineWidth=R*.1;ctx.beginPath();ctx.arc(0,0,R*.72,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=C.woodD;ctx.beginPath();ctx.arc(0,0,R*.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=C.amber;ctx.beginPath();ctx.arc(0,0,R*.08,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    // a qué banda está metida
+    const v=Math.round(ang/api.ratio);
+    ctx.font=`600 ${Math.round(w*.085)}px "IBM Plex Mono",monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=v<0?C.bad:v>0?C.ok:C.muted;ctx.fillText(v===0?'0':`${v<0?'Br':'Er'} ${Math.abs(v)}`,c,c+R*.46);
+  }
+  cv.addEventListener('pointerdown',e=>{if(!api.ok())return;const p=angOf(e);if(p.d<p.R*.12)return;
+    cv.setPointerCapture(e.pointerId);cv.classList.add('grab');const v=api.get();drag={start:v,acc:v*api.ratio,prev:p.a};e.preventDefault();});
+  cv.addEventListener('pointermove',e=>{if(!drag)return;const p=angOf(e);if(p.d<p.R*.12)return;
+    let d=p.a-drag.prev;if(d>180)d-=360;if(d<-180)d+=360;drag.prev=p.a;
+    drag.acc=Math.max(api.min*api.ratio,Math.min(api.max*api.ratio,drag.acc+d));
+    const v=Math.round(drag.acc/api.ratio);if(v!==api.get())api.set(v);});
+  const end=()=>{if(!drag)return;const s=drag.start;drag=null;cv.classList.remove('grab');api.done(s,api.get());};
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);cv.addEventListener('lostpointercapture',end);
+  (function tick(){if(cv.offsetParent)draw();requestAnimationFrame(tick);})();
+}
+wheel(document.getElementById('c-wheel'),window.__colregWheel);
+wheel(document.getElementById('m-wheel'),window.__manWheel);
+})();
+</script>
+<script>
+// App instalable (PWA): el service worker solo existe si se sirve por http(s), no al abrir el archivo directo.
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>

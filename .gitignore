@@ -1,0 +1,14 @@
+# Fotos de la hoja real del examen (MAZ-ACP-F-13) y respaldos: no se publican
+*.jpeg
+*.jpg
+*.zip
+
+# Banco de preguntas: los PDF de la guía (Daniela/) y todo el trabajo de extracción (banco/) se quedan en la compu.
+# Se publica solo lo que usa la app: quiz.html + quiz/banco.json + quiz/img/
+Daniela/
+banco/
+*.7z
+*.pdf
+
+# Notas internas de trabajo (traen nombres): no se publican
+CLAUDE.md
