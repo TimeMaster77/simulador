@@ -3,7 +3,7 @@
 // hay señal) y si no hay, salen de la caché. Íconos, figuras del banco, manifest y fuentes de Google salen
 // de la caché y se guardan la primera vez que se piden.
 // Si cambias la lista de APP, sube la versión de CACHE para que se borre la anterior.
-const CACHE = 'simguardia-v2';
+const CACHE = 'simguardia-v3';
 const APP = ['./', './index.html', './quiz.html', './quiz/banco.json', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

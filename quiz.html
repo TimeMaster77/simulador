@@ -38,7 +38,7 @@ a{color:var(--cyan)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .btn{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.03em;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:10px 14px;cursor:pointer;min-height:44px}
-.btn:hover{border-color:var(--amber-dim)}
+@media (hover:hover){.btn:hover{border-color:var(--amber-dim)}}
 .btn.pri{background:var(--amber);color:#1a1205;border-color:var(--amber)}
 .btn.sm{font-size:15px;padding:6px 10px;min-height:36px}
 .btn[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
@@ -73,7 +73,7 @@ select{font:inherit;background:var(--panel2);color:var(--fg);border:1px solid va
 .opt{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;text-align:left;font-family:var(--f-body);font-size:17px;font-weight:400;letter-spacing:0;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:10px 12px;cursor:pointer;min-height:50px}
 .opt b{font-family:var(--f-mono);font-weight:500;color:var(--amber);font-size:16px}
 .opt img{max-width:100%;max-height:120px;background:#fff;border-radius:3px}
-.opt:hover:not(:disabled){border-color:var(--amber-dim)}
+@media (hover:hover){.opt:hover:not(:disabled){border-color:var(--amber-dim)}}
 .opt:disabled{cursor:default}
 .opt.ok{border-color:var(--ok);background:#12301f}
 .opt.ok b{color:var(--ok)}
